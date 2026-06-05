@@ -232,96 +232,95 @@ def import_track(json_data: Dict[str, Any], imported_materials: Dict[str, Any] =
     # 设置track_id，使用原始ID
     track.track_id = json_data.get("id")
     
-    # 如果轨道类型允许修改，导入所有片段
-    if track_type.value.allow_modify and imported_materials:
-        for segment_data in json_data.get("segments", []):
-            material_id = segment_data.get("material_id")
-            material = None
+    # 始终导入所有片段。allow_modify 只决定是否转换为可编辑对象，
+    # 不能编辑的轨道/片段则退回为 ImportedSegment 以保证 round-trip 不丢数据。
+    for segment_data in json_data.get("segments", []):
+        material_id = segment_data.get("material_id")
+        material = None
+        segment = None
+        
+        # 处理关键帧信息
+        common_keyframes = []
+        for kf_list_data in segment_data.get("common_keyframes", []):
+            # 创建关键帧列表
+            kf_list = Keyframe_list(Keyframe_property(kf_list_data["property_type"]))
+            kf_list.list_id = kf_list_data["id"]
             
-            # 处理关键帧信息
-            common_keyframes = []
-            for kf_list_data in segment_data.get("common_keyframes", []):
-                # 创建关键帧列表
-                kf_list = Keyframe_list(Keyframe_property(kf_list_data["property_type"]))
-                kf_list.list_id = kf_list_data["id"]
-                
-                # 添加关键帧
-                for kf_data in kf_list_data["keyframe_list"]:
-                    keyframe = Keyframe(kf_data["time_offset"], kf_data["values"][0])
-                    keyframe.kf_id = kf_data["id"]
-                    keyframe.values = kf_data["values"]
-                    kf_list.keyframes.append(keyframe)
-                
-                common_keyframes.append(kf_list)
+            # 添加关键帧
+            for kf_data in kf_list_data["keyframe_list"]:
+                keyframe = Keyframe(kf_data["time_offset"], kf_data["values"][0])
+                keyframe.kf_id = kf_data["id"]
+                keyframe.values = kf_data["values"]
+                kf_list.keyframes.append(keyframe)
             
-            # 根据轨道类型查找对应的素材
-            if track_type == Track_type.video:
-                # 从imported_materials中查找视频素材
-                for video_material in imported_materials.get("videos", []):
-                    if video_material["id"] == material_id:
-                        material = Video_material.from_dict(video_material)
-                        break
-                
-                if material:
-                    # 创建视频片段
-                    segment = Video_segment(
-                        material=material,
-                        target_timerange=Timerange(
-                            start=segment_data["target_timerange"]["start"],
-                            duration=segment_data["target_timerange"]["duration"]
-                        ),
-                        source_timerange=Timerange(
-                            start=segment_data["source_timerange"]["start"],
-                            duration=segment_data["source_timerange"]["duration"]
-                        ),
-                        speed=segment_data.get("speed", 1.0),
-                        clip_settings=Clip_settings(
-                            transform_x=segment_data["clip"]["transform"]["x"],
-                            transform_y=segment_data["clip"]["transform"]["y"],
-                            scale_x=segment_data["clip"]["scale"]["x"],
-                            scale_y=segment_data["clip"]["scale"]["y"]
-                        )
+            common_keyframes.append(kf_list)
+        
+        # 对允许修改且能解析素材的音视频轨道，导入为可编辑片段
+        if imported_materials and track_type.value.allow_modify and track_type == Track_type.video:
+            # 从imported_materials中查找视频素材
+            for video_material in imported_materials.get("videos", []):
+                if video_material["id"] == material_id:
+                    material = Video_material.from_dict(video_material)
+                    break
+            
+            if material:
+                # 创建视频片段
+                segment = Video_segment(
+                    material=material,
+                    target_timerange=Timerange(
+                        start=segment_data["target_timerange"]["start"],
+                        duration=segment_data["target_timerange"]["duration"]
+                    ),
+                    source_timerange=Timerange(
+                        start=segment_data["source_timerange"]["start"],
+                        duration=segment_data["source_timerange"]["duration"]
+                    ),
+                    speed=segment_data.get("speed", 1.0),
+                    clip_settings=Clip_settings(
+                        transform_x=segment_data["clip"]["transform"]["x"],
+                        transform_y=segment_data["clip"]["transform"]["y"],
+                        scale_x=segment_data["clip"]["scale"]["x"],
+                        scale_y=segment_data["clip"]["scale"]["y"]
                     )
-                    segment.volume = segment_data.get("volume", 1.0)
-                    segment.visible = segment_data.get("visible", True)
-                    segment.common_keyframes = common_keyframes
-                    track.segments.append(segment)
-                
-            elif track_type == Track_type.audio:
-                # 从imported_materials中查找音频素材
-                for audio_material in imported_materials.get("audios", []):
-                    if audio_material["id"] == material_id:
-                        material = Audio_material.from_dict(audio_material)
-                        break
-                
-                if material:
-                    # 创建音频片段
-                    segment = Audio_segment(
-                        material=material,
-                        target_timerange=Timerange(
-                            start=segment_data["target_timerange"]["start"],
-                            duration=segment_data["target_timerange"]["duration"]
-                        ),
-                        volume=segment_data.get("volume", 1.0)
-                    )
-                    # 添加音频效果
-                    if "audio_effects" in imported_materials and imported_materials["audio_effects"]:
-                        effect_data = imported_materials["audio_effects"][0]
-                        # 根据资源ID查找对应的效果类型
-                        for effect_type in Audio_scene_effect_type:
-                            if effect_type.value.resource_id == effect_data["resource_id"]:
-                                # 将参数值从0-1映射到0-100
-                                params = []
-                                for param in effect_data["audio_adjust_params"]:
-                                    params.append(param["value"] * 100)
-                                segment.add_effect(effect_type, params,effect_id=effect_data["id"])
-                                break
-                    segment.common_keyframes = common_keyframes
-                    track.segments.append(segment)
-            else:
-                # 其他类型片段保持原样
-                segment = ImportedSegment(segment_data)
-                segment.common_keyframes = common_keyframes
-                track.segments.append(segment)
+                )
+                segment.volume = segment_data.get("volume", 1.0)
+                segment.visible = segment_data.get("visible", True)
+        
+        elif imported_materials and track_type.value.allow_modify and track_type == Track_type.audio:
+            # 从imported_materials中查找音频素材
+            for audio_material in imported_materials.get("audios", []):
+                if audio_material["id"] == material_id:
+                    material = Audio_material.from_dict(audio_material)
+                    break
+            
+            if material:
+                # 创建音频片段
+                segment = Audio_segment(
+                    material=material,
+                    target_timerange=Timerange(
+                        start=segment_data["target_timerange"]["start"],
+                        duration=segment_data["target_timerange"]["duration"]
+                    ),
+                    volume=segment_data.get("volume", 1.0)
+                )
+                # 添加音频效果
+                if "audio_effects" in imported_materials and imported_materials["audio_effects"]:
+                    effect_data = imported_materials["audio_effects"][0]
+                    # 根据资源ID查找对应的效果类型
+                    for effect_type in Audio_scene_effect_type:
+                        if effect_type.value.resource_id == effect_data["resource_id"]:
+                            # 将参数值从0-1映射到0-100
+                            params = []
+                            for param in effect_data["audio_adjust_params"]:
+                                params.append(param["value"] * 100)
+                            segment.add_effect(effect_type, params,effect_id=effect_data["id"])
+                            break
+
+        # 其他轨道，或音视频素材解析失败时，保持原样导入，避免 dump 时丢片段
+        if segment is None:
+            segment = ImportedSegment(segment_data)
+
+        segment.common_keyframes = common_keyframes
+        track.segments.append(segment)
     
     return track
