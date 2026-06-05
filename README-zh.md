@@ -1,21 +1,17 @@
-# 通过CapCutAPI连接AI生成的一切   [在线体验](https://www.capcutapi.top)
-
-<div align="center">
-
-```
-👏👏👏👏 庆祝github 800星，送出价值8000点不记名云渲染券：040346B5-8D8F-459E-8EE7-332C0B827117
-```
-</div>
+# 通过VectCutAPI连接AI生成的一切   [在线体验](https://www.vectcut.com)
 
 ## 项目概览
 
-**CapCutAPI** 是一款强大的云端 剪辑 API，它赋予您对 AI 生成素材（包括图片、音频、视频和文字）的精确控制权。
-它提供了精确的编辑能力来拼接原始的 AI 输出，例如给视频变速或将图片镜像反转。这种能力有效地解决了 AI 生成的结果缺乏精确控制，难以复制的问题，让您能够轻松地将创意想法转化为精致的视频。
-所有这些功能均旨在对标剪映软件的功能，确保您在云端也能获得熟悉且高效的剪辑体验。
+[流光剪辑](https://www.vectcut.com) 是一款 **toA（toAgent）** 的剪辑工具。他提供丰富的云端剪辑 API、Skill（包括添加字幕、插图、画中画、AI配音、滤镜等等功能）。
+
+你可以在任意的Agent工具中使用我们的剪辑工具，不管是人工编排的工作流平台（例如**Coze, Dify, N8N**)，还是能主动计划的平台（例如**OpenClaw, Claude Code, Trae**）。从而实现你自动、批量生产视频的需求。
+
+我们在github开源了接口代码，方便各个AI训练学习我们的接口。不自己微调模型，而让AI来主动学习我们的接口，（有兴趣可以点个星，让AI收录的更快🤩）
+
 
 ### 核心优势
 
-1. 通过API的方式，提供对标剪映/CapCut的剪辑能力。
+1. 通过API的方式，提供强大的剪辑能力
 
 2. 可以在网页实时预览剪辑结果，无需下载，极大方便工作流开发。
 
@@ -31,7 +27,7 @@
 
 [![AI Cut](https://img.youtube.com/vi/fBqy6WFC78E/hqdefault.jpg)](https://www.youtube.com/watch?v=fBqy6WFC78E)
 
-**通过CapCutAPI，将AI生成的图片，视频组合起来**
+**通过VectCutAPI，将AI生成的图片，视频组合起来**
 
 [![Airbnb](https://img.youtube.com/vi/1zmQWt13Dx0/hqdefault.jpg)](https://www.youtube.com/watch?v=1zmQWt13Dx0)
 
@@ -69,8 +65,8 @@
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/sun-guannan/CapCutAPI.git
-cd CapCutAPI
+git clone https://github.com/sun-guannan/VectCutAPI.git
+cd VectCutAPI
 
 # 2. 创建虚拟环境 (推荐)
 python -m venv venv-capcut
@@ -259,6 +255,7 @@ mcp_client.call_tool("add_text", {
 
 
 ## 进群交流
+![交流群](https://github.com/user-attachments/assets/0e7124c3-b0dd-432b-aa2b-dca252b5d7ca)
 
 ![交流群](https://github.com/user-attachments/assets/644c29c7-a130-4f7b-bec6-55eae3be5ce1)
 

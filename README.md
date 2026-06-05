@@ -1,10 +1,13 @@
 
-# Connect AI generates via CapCutAPI [Try it online](https://www.capcutapi.top)
+# Connect AI generates via VectCutAPI [Try it online](https://www.vectcut.com)
 
-## Project Overview
-**CapCutAPI** is a powerful editing API that empowers you to take full control of your AI-generated assets, including images, audio, video, and text. It provides the precision needed to refine and customize raw AI output, such as adjusting video speed or mirroring an image. This capability effectively solves the lack of control often found in AI video generation, allowing you to easily transform your creative ideas into polished videos.
+## Preview
 
-All these features are designed to mirror the functionalities of the CapCut software, ensuring a familiar and efficient editing experience in the cloud.
+**VectCut** is a **toA (toAgent)** video editing tool. It provides a rich set of cloud-based editing APIs and Skills, including features such as adding subtitles, illustrations, picture-in-picture (PiP), AI voiceovers, filters, and more.
+
+You can integrate our editing tools into any Agent-based environment, whether it’s a manually orchestrated workflow platform (such as **Coze, Dify, or N8N**) or an autonomous planning platform (such as **OpenClaw, Claude Code, or Trae**). This enables you to meet your needs for automated and bulk video production.
+
+We have open-sourced our interface code on GitHub, making it easy for various AI models to train on and learn our interfaces. Instead of fine-tuning models yourself, you can let the AI actively learn our API (feel free to give us a star to help AI index it even faster! 🤩).
 
 Enjoy It!  😀😀😀
 
@@ -12,7 +15,7 @@ Enjoy It!  😀😀😀
 
 ### Advantages
 
-1. **API-Powered Editing:** Access all CapCut/Jianying editing features, including multi-track editing and keyframe animation, through a powerful API.
+1. **API-Powered Editing:** Access all powerfull editing features, including multi-track editing and keyframe animation, through a powerful API.
 
 2. **Real-Time Cloud Preview:** Instantly preview your edits on a webpage without downloads, dramatically improving your workflow.
 
@@ -28,7 +31,7 @@ Enjoy It!  😀😀😀
 
 [![AI Cut](https://img.youtube.com/vi/fBqy6WFC78E/hqdefault.jpg)](https://www.youtube.com/watch?v=fBqy6WFC78E)
 
-**Combine AI-generated images and videos using CapCutAPI**
+**Combine AI-generated images and videos using VectCutAPI**
 
 [More](pattern)
 
@@ -68,8 +71,8 @@ Enjoy It!  😀😀😀
 
 ```bash
 # 1. Clone the project
-git clone https://github.com/sun-guannan/CapCutAPI.git
-cd CapCutAPI
+git clone https://github.com/sun-guannan/VectCutAPI.git
+cd VectCutAPI
 
 # 2. Create a virtual environment (recommended)
 python -m venv venv-capcut
@@ -92,6 +95,9 @@ python capcut_server.py # Start the HTTP API server, default port: 9001
 
 python mcp_server.py # Start the MCP protocol service, supports stdio communication
 ```
+## Skill Integration Guide
+[Skill中文文档](https://github.com/sun-guannan/VectCutAPI/blob/main/vectcut-skill/README.md)
+[Skill Guide](https://github.com/sun-guannan/VectCutAPI/blob/main/vectcut-skill/README_EN.md)
 
 ## MCP Integration Guide
 
@@ -157,7 +163,7 @@ import requests
 
 # Add title text
 response = requests.post("http://localhost:9001/add_text", json={
-    "text": "Welcome to CapCutAPI",
+    "text": "Welcome to VectCutAPI",
     "start": 0,
     "end": 5,
     "font": "Source Han Sans",read
@@ -261,20 +267,13 @@ We welcome contributions of all forms\! Our iteration rules are:
 
 ## Contact Us
 
-If you want to:
-
-  - Feedback on issues
-  - Feature suggestions
-  - Get latest news
-
-**Contact**: sguann2023@gmail.com
 ### 🤝 Collaboration
 
-  - **Video Production**: Want to use this API for batch production of videos? I offer free consulting services to help you use this API. In return, I'll ask for the production workflow template to be **open-sourced** in the `template` directory of this project.
+  - **Video Production**: Want to use this API for batch production of videos with AIGC? 
 
   - **Join us**: Our goal is to provide a stable and reliable video editing tool that integrates well with AI-generated images, videos, and audio. If you are interested, submit a PR and I'll see it. For more in-depth involvement, the code for the MCP Editing Agent, web-based editing client, and cloud rendering modules has not been open-sourced yet.
 
-**Contact**: sguann2023@gmail.com
+**Contact**: abelchrisnic@gmail.com
 
 ## 📈 Star History
 
