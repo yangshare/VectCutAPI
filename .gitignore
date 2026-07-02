@@ -15,3 +15,7 @@ config.json
 .venv/
 venv/
 tmp/
+
+.claude/
+.codegraph/
+CLAUDE.md
