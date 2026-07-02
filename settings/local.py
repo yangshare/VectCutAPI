@@ -24,6 +24,9 @@ PREVIEW_ROUTER = "/draft/downloader"
 # 是否上传草稿文件
 IS_UPLOAD_DRAFT = False
 
+# 本地草稿输出目录（绝对路径），为空则使用服务运行目录
+DRAFT_FOLDER = ""
+
 # 端口号
 PORT = 9000
 
@@ -71,6 +74,10 @@ if os.path.exists(CONFIG_FILE_PATH):
             # 更新是否上传草稿文件
             if "is_upload_draft" in local_config:
                 IS_UPLOAD_DRAFT = local_config["is_upload_draft"]
+
+            # 更新本地草稿输出目录
+            if "draft_folder" in local_config:
+                DRAFT_FOLDER = local_config["draft_folder"]
                 
             # 更新OSS配置
             if "oss_config" in local_config:

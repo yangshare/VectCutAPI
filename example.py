@@ -2,7 +2,7 @@ import requests
 import json
 import sys
 import time
-from settings.local import PORT
+from settings.local import PORT, DRAFT_FOLDER
 from util import timing_decorator
 import functools
 import threading
@@ -16,8 +16,9 @@ import os
 BASE_URL = f"http://localhost:{PORT}"
 LICENSE_KEY = "trial"  # Trial license key
 
-CAPCUT_DRAFT_FOLDER = "/Users/sunguannan/Movies/CapCut/User Data/Projects/com.lveditor.draft"
-JIANYINGPRO_DRAFT_FOLDER = "/Users/sunguannan/Movies/JianyingPro/User Data/Projects/com.lveditor.draft"
+# 草稿目录统一从 config.json 的 draft_folder 读取；为空则由服务端回退到运行目录
+CAPCUT_DRAFT_FOLDER = DRAFT_FOLDER
+JIANYINGPRO_DRAFT_FOLDER = DRAFT_FOLDER
 
 def make_request(endpoint, data, method='POST'):
     """Send HTTP request to the server and handle the response"""
