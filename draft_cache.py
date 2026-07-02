@@ -1,19 +1,5 @@
-from collections import OrderedDict
-import pyJianYingDraft as draft
-from typing import Dict
+"""垫片：转发到 vectcut.core.draft_store.DRAFT_CACHE / update_cache。
 
-# Modify global variable, use OrderedDict to implement LRU cache, limit the maximum number to 10000
-DRAFT_CACHE: Dict[str, 'draft.Script_file'] = OrderedDict()  # Use Dict for type hinting
-MAX_CACHE_SIZE = 10000
-
-def update_cache(key: str, value: draft.Script_file) -> None:
-    """Update LRU cache"""
-    if key in DRAFT_CACHE:
-        # If the key exists, delete the old item
-        DRAFT_CACHE.pop(key)
-    elif len(DRAFT_CACHE) >= MAX_CACHE_SIZE:
-        print(f"{key}, Cache is full, deleting the least recently used item")
-        # If the cache is full, delete the least recently used item (the first item)
-        DRAFT_CACHE.popitem(last=False)
-    # Add new item to the end (most recently used)
-    DRAFT_CACHE[key] = value
+业务代码阶段 5 才统一切换到 vectcut.core.draft_store 直连；在此之前保留此转发。
+"""
+from vectcut.core.draft_store import DRAFT_CACHE, MAX_CACHE_SIZE, update_cache  # noqa: F401

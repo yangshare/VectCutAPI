@@ -104,16 +104,6 @@ def test_shared_draft_asset_path_keeps_drive_root():
     ) == r"D:\JianyingPro Drafts\draft-1\assets\image\cover.png"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "过渡态：save_draft_impl 本阶段仍 `from draft_cache import DRAFT_CACHE`（根模块，"
-        "独立的 OrderedDict），而本测试向 vectcut.core.draft_store.DRAFT_CACHE 注入草稿，"
-        "两者不同源故 save_draft_background 取不到草稿。任务5 将根 draft_cache.py 改为"
-        "转发 vectcut.core.draft_store 的垫片后，两个引用指向同一 OrderedDict，本测试自然通过；"
-        "届时 strict=True 会以 XPASS 报错，提示移除本标记。"
-    ),
-)
 def test_save_draft_writes_to_requested_draft_folder(tmp_path, monkeypatch):
     import save_draft_impl
     from vectcut.core.draft_store import DRAFT_CACHE
