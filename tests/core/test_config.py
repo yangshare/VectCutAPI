@@ -83,3 +83,35 @@ def test_load_config_missing_file_uses_defaults_and_does_not_raise(tmp_path):
     cfg = load_config(tmp_path / "nope.json")
     assert cfg.draft_profile == "capcut_legacy"  # 缺省默认
     assert cfg.is_capcut_env is True
+
+
+# ─── 步骤 1：settings 垫片回归测试 ───────────────────────────────────────────
+
+
+def test_settings_shim_reexports_legacy_constants_from_config():
+    """capcut_server.py 仍 `from settings.local import IS_CAPCUT_ENV, DRAFT_DOMAIN,
+    PREVIEW_ROUTER, PORT` — 垫片必须继续导出这些名字且值与 config 一致。"""
+    import settings
+    import settings.local as local
+    from vectcut.core.config import load_config
+
+    cfg = load_config(None)
+
+    assert settings.IS_CAPCUT_ENV == cfg.is_capcut_env
+    assert local.IS_CAPCUT_ENV == cfg.is_capcut_env
+    assert local.DRAFT_DOMAIN == cfg.draft_domain
+    assert local.PREVIEW_ROUTER == cfg.preview_router
+    assert local.PORT == cfg.port
+    assert local.DRAFT_PROFILE == cfg.draft_profile
+    assert local.IS_UPLOAD_DRAFT == cfg.is_upload_draft
+    assert local.DRAFT_FOLDER == cfg.draft_folder
+
+
+def test_settings_shim_drops_dead_code():
+    """死代码已删：__all__ 不再声明 4 个无人定义的名字，get_platform_info 已移除。"""
+    import settings
+
+    for dead in ("API_KEYS", "MODEL_CONFIG", "PURCHASE_LINKS", "LICENSE_CONFIG"):
+        assert dead not in getattr(settings, "__all__", [])
+        assert not hasattr(settings, dead)
+    assert not hasattr(settings, "get_platform_info")
