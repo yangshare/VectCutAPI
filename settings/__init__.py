@@ -1,18 +1,20 @@
-"""配置包垫片：仅供 pyJianYingDraft 引擎两处 `from settings import IS_CAPCUT_ENV`
-（video_segment.py:14 / script_file.py:22）以及旧业务模块 `from settings import IS_UPLOAD_DRAFT, DRAFT_FOLDER`
-继续工作。
+"""配置包垫片：转发到 vectcut.core.config。
 
-依赖方向单一：引擎/旧模块 → settings 垫片 → vectcut.core.config（真源）。
-垫片仅转发在用的常量名，删除从未被 local 定义的死名（API_KEYS / MODEL_CONFIG /
-PURCHASE_LINKS / LICENSE_CONFIG）和无调用方的 get_platform_info()。
+消费方：
+- pyJianYingDraft 引擎（video_segment.py:14 / script_file.py:22）`from settings import IS_CAPCUT_ENV`
+- vectcut.core.util（generate_draft_url）`from settings.local import DRAFT_DOMAIN, PREVIEW_ROUTER, IS_CAPCUT_ENV`
+- examples._client / scripts.gen_local_draft `from settings(.local) import PORT, DRAFT_FOLDER`
+- oss.py（根，待任务2 迁 vectcut/core/）`from settings.local import OSS_CONFIG, MP4_OSS_CONFIG`
+
+依赖方向单一：上述消费方 → settings 垫片 → vectcut.core.config（真源）。
+阶段5 任务8：删 DRAFT_PROFILE / IS_UPLOAD_DRAFT（无实代码引用）。
+待任务2 迁 oss.py 后，剩余常量改由消费方直读 config，本垫片再瘦身至仅 IS_CAPCUT_ENV。
 """
 
 from .local import (  # noqa: F401
     IS_CAPCUT_ENV,
-    DRAFT_PROFILE,
     DRAFT_DOMAIN,
     PREVIEW_ROUTER,
-    IS_UPLOAD_DRAFT,
     DRAFT_FOLDER,
     PORT,
     OSS_CONFIG,
@@ -21,10 +23,8 @@ from .local import (  # noqa: F401
 
 __all__ = [
     "IS_CAPCUT_ENV",
-    "DRAFT_PROFILE",
     "DRAFT_DOMAIN",
     "PREVIEW_ROUTER",
-    "IS_UPLOAD_DRAFT",
     "DRAFT_FOLDER",
     "PORT",
     "OSS_CONFIG",
