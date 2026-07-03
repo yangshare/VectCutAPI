@@ -1,9 +1,8 @@
 """FastAPI app + envelope helper + 全局异常 handler。
 
-保真约束：业务异常（VectCutError）与验证异常（RequestValidationError）响应体
-恒为 200 + {success, output, error}。兜底 Exception 因 FastAPI build_middleware_stack
-将 Exception/500 handler 移交 ServerErrorMiddleware（始终 re-raise）而无法在
-TestClient 中以 200 外壳验证，故省略；生产环境 ServerErrorMiddleware 会以 500 响应。
+保真约束：所有路由响应体恒为 200 + {success, output, error}（与现有 Flask
+flask_router.py 外壳逐字一致，黄金测试 assert status_code==200 是硬约束）。
+规格 §4.4 的语义状态码（422/404）列为本阶段非目标。
 """
 from __future__ import annotations
 
@@ -23,12 +22,11 @@ def envelope_err(error: str) -> dict:
 
 
 def _wire_exception_handlers(app: FastAPI) -> None:
-    """把 VectCutError / ValidationError 统一转成 200 外壳。
+    """把 VectCutError / ValidationError / 兜底异常统一转成 200 外壳。
 
     抽成函数以便测试在独立 sub-app 上复用同一套 handler。
-    注意：FastAPI 的 build_middleware_stack 会将 Exception/500 handler 移交
-    ServerErrorMiddleware，导致 TestClient 中 re-raise，无法以 200 外壳验证。
-    兜底异常由 ServerErrorMiddleware 以默认 500 处理。
+    注意：TestClient 默认 raise_server_exceptions=True 会 re-raise 未处理异常，
+    测试需用 raise_server_exceptions=False 以验证兜底 Exception handler 返回 200 外壳。
     """
 
     @app.exception_handler(VectCutError)
@@ -42,6 +40,10 @@ def _wire_exception_handlers(app: FastAPI) -> None:
             status_code=200,
             content=envelope_err(f"Hi, the required parameters are missing. {exc}"),
         )
+
+    @app.exception_handler(Exception)
+    async def _unexpected_error_handler(_req: Request, exc: Exception):
+        return JSONResponse(status_code=200, content=envelope_err(str(exc)))
 
 
 app = FastAPI(title="VectCutAPI")

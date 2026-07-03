@@ -1,8 +1,8 @@
 """FastAPI app 骨架测试：envelope 工具函数 + 全局异常 handler。
 不挂业务 router，只测 handler 把异常转成 200 + {success,output,error} 外壳。
 
-注：FastAPI build_middleware_stack 将 Exception/500 handler 移交 ServerErrorMiddleware
-（始终 re-raise），TestClient 中无法以 200 外壳验证。兜底异常以默认 500 处理。
+注：TestClient 默认 raise_server_exceptions=True 会 re-raise 未处理异常，
+故 _bare_client 用 raise_server_exceptions=False 以验证兜底 handler 的 200 外壳。
 """
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -20,7 +20,10 @@ def test_envelope_err_shape():
 
 
 def _bare_client() -> TestClient:
-    """独立 app（不挂业务 router）测 handler：手动加一条临时路由。"""
+    """独立 app（不挂业务 router）测 handler：手动加一条临时路由。
+    用 raise_server_exceptions=False 以验证兜底 Exception handler 返回 200 外壳
+    （默认 TestClient 会 re-raise 未处理异常）。
+    """
     sub = FastAPI()
 
     @sub.post("/raise_invalid")
@@ -36,17 +39,7 @@ def _bare_client() -> TestClient:
         raise ValueError("plain")
 
     _wire_exception_handlers(sub)
-    return TestClient(sub)
-
-
-def test_unhandled_exception_propagates_in_testclient():
-    """未注册 handler 的异常在 TestClient 中会 re-raise（Starlette ServerErrorMiddleware
-    始终 re-raise 以支持服务器日志）；生产环境返回默认 500 响应。"""
-    import pytest
-
-    client = _bare_client()
-    with pytest.raises(ValueError, match="plain"):
-        client.post("/raise_value_error")
+    return TestClient(sub, raise_server_exceptions=False)
 
 
 def test_invalid_param_handler_returns_200_envelope():
@@ -67,6 +60,15 @@ def test_draft_not_found_handler_returns_200_envelope():
     assert "dfd_x" in resp.json()["error"]
 
 
+def test_unexpected_exception_handler_returns_200_envelope():
+    client = _bare_client()
+    resp = client.post("/raise_value_error")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is False
+    assert "plain" in body["error"]
+
+
 def test_validation_error_handler_returns_200_envelope():
     """RequestValidationError 由 FastAPI Pydantic 校验触发，返回 200 外壳。"""
     sub = FastAPI()
@@ -76,7 +78,7 @@ def test_validation_error_handler_returns_200_envelope():
         return {"ok": True}
 
     _wire_exception_handlers(sub)
-    client = TestClient(sub)
+    client = TestClient(sub, raise_server_exceptions=False)
     # 发送空 body，触发 FastAPI 参数校验缺失
     resp = client.post("/validate")
     assert resp.status_code == 200
