@@ -21,6 +21,19 @@ METADATA_ROUTES = [
     "/get_text_loop_anim_types",
     "/get_video_scene_effect_types",
     "/get_video_character_effect_types",
+    # 阶段 1 新增的参数化路由（与对应旧别名输出必须等价）
+    "/metadata/intro_animation",
+    "/metadata/outro_animation",
+    "/metadata/combo_animation",
+    "/metadata/transition",
+    "/metadata/mask",
+    "/metadata/audio_effect",
+    "/metadata/font",
+    "/metadata/text_intro",
+    "/metadata/text_outro",
+    "/metadata/text_loop_anim",
+    "/metadata/video_scene_effect",
+    "/metadata/video_character_effect",
 ]
 
 
