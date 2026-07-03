@@ -6,8 +6,6 @@ REGENERATE_GOLDEN=1 时，测试把当前路由输出写回 snapshots/ 而非比
 import os
 from pathlib import Path
 
-import pytest
-
 SNAPSHOT_DIR = Path(__file__).parent / "snapshots"
 
 
