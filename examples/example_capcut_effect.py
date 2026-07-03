@@ -6,7 +6,9 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 从example.py中导入必要的函数
-from example import add_video_impl, add_effect, save_draft_impl
+from video_demo import add_video_impl
+from effect_demo import add_effect
+from draft_demo import save_draft_impl
 
 def example_capcut_effect():
     """Test service for adding effects"""

@@ -10,7 +10,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from example import add_image_impl
+from image_demo import add_image_impl
 
 PORT=9001       #端口
 BASE_URL = f"http://localhost:{PORT}"
