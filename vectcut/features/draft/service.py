@@ -9,9 +9,10 @@ from __future__ import annotations
 from vectcut.core.config import load_config
 from vectcut.core.draft_store import DRAFT_CACHE, get_active_profile, get_or_create_draft
 from vectcut.core.errors import DraftNotFound
-from vectcut.features.draft._save_engine import save_draft_background
+from vectcut.features.draft._save_engine import save_draft_background, get_video_duration as _get_video_duration_impl
 from vectcut.features.draft.schemas import (
     CreateDraftRequest, CreateDraftResponse,
+    GetVideoDurationRequest, GetVideoDurationResponse,
     QueryDraftStatusRequest, QueryDraftStatusResponse,
     QueryScriptRequest, QueryScriptResponse,
     SaveDraftRequest, SaveDraftResponse,
@@ -52,3 +53,16 @@ def query_script(req: QueryScriptRequest) -> QueryScriptResponse:
 def query_task_status(req: QueryDraftStatusRequest) -> QueryDraftStatusResponse:
     status = get_task_status(req.task_id)
     return QueryDraftStatusResponse(success=True, output=status, error="")
+
+
+def get_video_duration(req: GetVideoDurationRequest) -> GetVideoDurationResponse:
+    """MCP/HTTP 共用的视频时长查询。委托 _save_engine.get_video_duration（ffprobe）。
+
+    返回 {success, output, error} 结构（与根目录 get_duration_impl.py 历史输出一致）。
+    """
+    result = _get_video_duration_impl(req.video_url)
+    return GetVideoDurationResponse(
+        success=result["success"],
+        output=result["output"],
+        error=result["error"],
+    )

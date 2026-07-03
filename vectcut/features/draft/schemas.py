@@ -58,3 +58,13 @@ class GenerateDraftUrlResponse(BaseModel):
     success: bool = True
     draft_url: str = ""
     error: str = ""
+
+
+class GetVideoDurationRequest(BaseModel):
+    video_url: str
+
+
+class GetVideoDurationResponse(BaseModel):
+    success: bool = True
+    output: Any = 0.0
+    error: Optional[str] = None
