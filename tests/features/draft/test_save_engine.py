@@ -15,17 +15,17 @@ def _clean_cache():
 
 def test_save_draft_background_draft_not_in_cache_marks_failed(tmp_path, monkeypatch):
     from vectcut.features.draft import _save_engine
-    from vectcut.features.draft._save_engine import save_task_cache
+    from vectcut.features.draft._save_engine import task_cache
 
     status = _save_engine.save_draft_background("missing_id", str(tmp_path), "missing_id")
     assert status == ""
-    task = save_task_cache.get_task_status("missing_id")
+    task = task_cache.get_task_status("missing_id")
     assert task["status"] == "failed"
 
 
 def test_save_draft_background_writes_profile_content(tmp_path, monkeypatch):
     from vectcut.features.draft import _save_engine
-    from vectcut.features.draft._save_engine import save_task_cache
+    from vectcut.features.draft._save_engine import task_cache
 
     # 准备一个空 draft
     draft_id, script = draft_store.get_or_create_draft(None, 1080, 1920)
@@ -38,7 +38,7 @@ def test_save_draft_background_writes_profile_content(tmp_path, monkeypatch):
     url = _save_engine.save_draft_background(draft_id, out_dir, draft_id)
     # 空 draft + IS_UPLOAD_DRAFT 默认 False → 不上传，draft_url 为 ""
     assert url == ""
-    task = save_task_cache.get_task_status(draft_id)
+    task = task_cache.get_task_status(draft_id)
     assert task["status"] == "completed"
     assert task["progress"] == 100
     # profile content 文件应已落盘

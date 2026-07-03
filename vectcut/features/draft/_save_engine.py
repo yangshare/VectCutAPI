@@ -17,16 +17,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import imageio.v2 as imageio
 
-from downloader import download_file  # 阶段5再迁 downloader
-import save_task_cache  # noqa: F401  纯内存 LRU，测试经 _save_engine.save_task_cache 访问
-from save_task_cache import (  # 单函数别名
+from vectcut.core.downloader import download_file
+from vectcut.core import task_cache  # noqa: F401  纯内存 LRU，测试经 _save_engine.task_cache 访问
+from vectcut.core.task_cache import (  # 单函数别名
     get_task_status,
     update_task_field,
     update_task_fields,
     update_tasks_cache,
 )
 from vectcut.core.util import build_draft_asset_path, zip_draft
-from oss import upload_to_oss
+from vectcut.core.oss import upload_to_oss
 from vectcut.core.config import load_config
 from vectcut.core.draft_store import DRAFT_CACHE, get_active_profile, write_profile_content
 

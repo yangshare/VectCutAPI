@@ -17,7 +17,7 @@ from vectcut.features.draft.schemas import (
     QueryScriptRequest, QueryScriptResponse,
     SaveDraftRequest, SaveDraftResponse,
 )
-from save_task_cache import get_task_status
+from vectcut.core.task_cache import get_task_status
 
 
 def generate_draft_url(draft_id: str) -> str:

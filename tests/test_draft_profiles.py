@@ -106,7 +106,7 @@ def test_save_draft_writes_to_requested_draft_folder(tmp_path, monkeypatch):
     from vectcut.features.draft import _save_engine as save_draft_impl
     from vectcut.core.draft_store import DRAFT_CACHE
     from vectcut.core.draft_store import get_draft_profile
-    from save_task_cache import create_task
+    from vectcut.core.task_cache import create_task
 
     draft_id = "draft-target-folder"
     payload = {"tracks": [], "materials": {}, "duration": 0}
