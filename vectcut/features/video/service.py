@@ -11,6 +11,7 @@ from pyJianYingDraft import Clip_settings, trange
 from vectcut.core.draft_store import get_draft, get_or_create_draft
 from vectcut.core.errors import DraftNotFound, InvalidParam
 from vectcut.engine import material_factory as mf
+from vectcut.engine.material_factory import BLUR_MAP as _BLUR_MAP
 from vectcut.features.draft.service import generate_draft_url
 from vectcut.features.video.schemas import (
     AddVideoKeyframeRequest,
@@ -19,8 +20,6 @@ from vectcut.features.video.schemas import (
     AddVideoResponse,
 )
 from util import url_to_hash
-
-_BLUR_MAP = {1: 0.0625, 2: 0.375, 3: 0.75, 4: 1.0}
 
 
 def add_video(req: AddVideoRequest) -> AddVideoResponse:

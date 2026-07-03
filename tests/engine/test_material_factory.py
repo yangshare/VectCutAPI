@@ -95,3 +95,91 @@ def test_add_to_track_creates_track_if_missing():
     seg = draft.Video_segment(material, target_timerange=draft.trange("0s", "1s"), source_timerange=draft.trange("0s", "1s"))
     mf.add_to_track(script, seg, track_name="video_main", track_type=draft.Track_type.video, relative_index=0)
     assert len(script.materials.videos) == 1
+
+
+def test_build_photo_material_sets_material_type_photo_and_remote_url():
+    from vectcut.engine import material_factory as mf
+
+    m = mf.build_photo_material(
+        image_url="https://example.com/a.png",
+        draft_folder=None,
+        draft_id="dfd_x",
+        material_name="image_abc.png",
+    )
+    assert m is not None  # Video_material 实例（material_type='photo'）
+    assert m.material_type == "photo"
+    assert m.remote_url == "https://example.com/a.png"
+    assert m.material_name == "image_abc.png"
+
+
+def test_build_photo_material_sets_replace_path_when_draft_folder_given(monkeypatch):
+    from vectcut.engine import material_factory as mf
+
+    m = mf.build_photo_material(
+        image_url="https://example.com/a.png",
+        draft_folder="D:/drafts",
+        draft_id="dfd_x",
+        material_name="image_abc.png",
+    )
+    assert m is not None  # replace_path 路径已注入（构造不下载，只赋字段）
+    assert m.replace_path is not None
+    assert "image_abc.png" in m.replace_path
+
+
+def test_resolve_intro_returns_member_for_active_platform(monkeypatch):
+    from vectcut.engine import material_factory as mf
+
+    monkeypatch.setattr(mf.adapter, "active_platform", lambda: "capcut")
+    member = mf.resolve_intro("Zoom_1")  # Intro_type / CapCut_Intro_type 成员
+    assert member is not None
+
+
+def test_resolve_outro_returns_member_for_active_platform(monkeypatch):
+    from vectcut.engine import material_factory as mf
+
+    monkeypatch.setattr(mf.adapter, "active_platform", lambda: "capcut")
+    assert mf.resolve_outro("Fade_Out") is not None
+
+
+def test_resolve_combo_returns_member_for_active_platform(monkeypatch):
+    from vectcut.engine import material_factory as mf
+
+    monkeypatch.setattr(mf.adapter, "active_platform", lambda: "capcut")
+    assert mf.resolve_combo("Zoom_1") is not None
+
+
+def test_resolve_text_intro_returns_member_for_active_platform(monkeypatch):
+    from vectcut.engine import material_factory as mf
+
+    monkeypatch.setattr(mf.adapter, "active_platform", lambda: "capcut")
+    assert mf.resolve_text_intro("Fade_In") is not None
+
+
+def test_resolve_text_outro_returns_member_for_active_platform(monkeypatch):
+    from vectcut.engine import material_factory as mf
+
+    monkeypatch.setattr(mf.adapter, "active_platform", lambda: "capcut")
+    assert mf.resolve_text_outro("Fade_Out") is not None
+
+
+def test_resolve_video_effect_dispatches_scene_and_character(monkeypatch):
+    from vectcut.engine import material_factory as mf
+
+    monkeypatch.setattr(mf.adapter, "active_platform", lambda: "capcut")
+    scene = mf.resolve_video_effect("scene", "Blur")
+    char = mf.resolve_video_effect("character", "Woman_4")
+    assert scene is not None and char is not None
+
+
+def test_resolve_video_effect_unknown_category_raises_key_error():
+    import pytest
+    from vectcut.engine import material_factory as mf
+
+    with pytest.raises(KeyError):
+        mf.resolve_video_effect("unknown_category", "whatever")
+
+
+def test_blur_map_constant_matches_source_levels():
+    from vectcut.engine.material_factory import BLUR_MAP
+
+    assert BLUR_MAP == {1: 0.0625, 2: 0.375, 3: 0.75, 4: 1.0}

@@ -16,6 +16,10 @@ from util import build_draft_asset_path
 from vectcut.engine import adapter
 
 
+# 背景模糊等级表（迁自 add_image_impl.py:218-223 与 video/service.py，image/video 共用）
+BLUR_MAP = {1: 0.0625, 2: 0.375, 3: 0.75, 4: 1.0}
+
+
 def build_video_material(
     video_url: str,
     draft_folder: Optional[str],
@@ -57,6 +61,27 @@ def build_audio_material(
     return draft.Audio_material(**kwargs)
 
 
+def build_photo_material(
+    image_url: str,
+    draft_folder: Optional[str],
+    draft_id: str,
+    material_name: str,
+) -> "draft.Video_material":
+    """构造图片材料（Video_material material_type='photo'）。draft_folder 非空时设 replace_path。
+
+    迁自 add_image_impl.py:122-125：path=None 始终，draft_folder 决定 replace_path。
+    """
+    kwargs = dict(
+        path=None,
+        material_type="photo",
+        remote_url=image_url,
+        material_name=material_name,
+    )
+    if draft_folder:
+        kwargs["replace_path"] = build_draft_asset_path(draft_folder, draft_id, "image", material_name)
+    return draft.Video_material(**kwargs)
+
+
 def add_to_track(script, segment, track_name: Optional[str], track_type, relative_index: int = 0) -> None:
     """get-or-create 命名轨道并添加段。track_name 为 None 时建匿名轨道。"""
     if track_name is not None:
@@ -77,6 +102,45 @@ def resolve_transition(name: str):
 def resolve_mask(name: str):
     """按激活平台返回 Mask_type / CapCut_Mask_type 的成员。"""
     return getattr(adapter.enum_for("mask"), name)
+
+
+def resolve_intro(name: str):
+    """视频段进场动画成员（Intro_type / CapCut_Intro_type）。未知名抛 AttributeError。"""
+    return getattr(adapter.enum_for("intro_animation"), name)
+
+
+def resolve_outro(name: str):
+    """视频段出场动画成员（Outro_type / CapCut_Outro_type）。"""
+    return getattr(adapter.enum_for("outro_animation"), name)
+
+
+def resolve_combo(name: str):
+    """视频段组合动画成员（Group_animation_type / CapCut_Group_animation_type）。"""
+    return getattr(adapter.enum_for("combo_animation"), name)
+
+
+def resolve_text_intro(name: str):
+    """文本段进场动画成员（Text_intro / CapCut_Text_intro）。"""
+    return getattr(adapter.enum_for("text_intro"), name)
+
+
+def resolve_text_outro(name: str):
+    """文本段出场动画成员（Text_outro / CapCut_Text_outro）。"""
+    return getattr(adapter.enum_for("text_outro"), name)
+
+
+def resolve_video_effect(category: str, name: str):
+    """场景/人物特效成员。category ∈ {'scene','character'}，未知名抛 AttributeError。
+
+    迁自 add_effect_impl.py:43-68 的 IS_CAPCUT_ENV 分支：
+      scene     → video_scene_effect     (Video_scene_effect_type / CapCut_Video_scene_effect_type)
+      character → video_character_effect (Video_character_effect_type / CapCut_Video_character_effect_type)
+    未知 category 抛 KeyError（与 enum_for 未知 kind 一致），由 service 转 InvalidParam。
+    """
+    kind = {"scene": "video_scene_effect", "character": "video_character_effect"}.get(category)
+    if kind is None:
+        raise KeyError(category)
+    return getattr(adapter.enum_for(kind), name)
 
 
 def resolve_audio_effect(name: str) -> Optional[Tuple[object, str]]:
