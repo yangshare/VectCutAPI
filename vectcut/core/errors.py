@@ -20,3 +20,24 @@ class InvalidParam(VectCutError):
 
     code = "INVALID_PARAM"
     http_status = 422
+
+
+class DraftNotFound(VectCutError):
+    """草稿不存在于缓存（draft_id 未注册）。HTTP 404 / JSON-RPC -32001。"""
+
+    code = "DRAFT_NOT_FOUND"
+    http_status = 404
+
+
+class EngineError(VectCutError):
+    """pyJianYingDraft 引擎抛出异常（段/轨道/材料构造失败等）。HTTP 500 / -32003。"""
+
+    code = "ENGINE_ERROR"
+    http_status = 500
+
+
+class MediaDownloadError(VectCutError):
+    """素材下载失败（HTTP 4xx/5xx、ffprobe 失败等）。HTTP 502 / -32004。"""
+
+    code = "MEDIA_DOWNLOAD_ERROR"
+    http_status = 502
