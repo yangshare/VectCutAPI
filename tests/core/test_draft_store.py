@@ -162,3 +162,23 @@ def test_get_active_profile_reads_draft_profile_from_config(monkeypatch):
     assert isinstance(profile, DraftProfile)
     assert profile.name == "jianying_pro_10"
     assert profile.template_dir == "template_jianying_10_2"
+
+
+def test_get_or_create_draft_creates_new_when_id_none():
+    from vectcut.core import draft_store
+
+    draft_store.DRAFT_CACHE.clear()
+    draft_id, script = draft_store.get_or_create_draft(draft_id=None, width=1080, height=1920)
+    assert draft_id.startswith("dfd_cat_")
+    assert draft_id in draft_store.DRAFT_CACHE
+    assert script is draft_store.DRAFT_CACHE[draft_id]
+
+
+def test_get_or_create_draft_returns_cached_when_id_present():
+    from vectcut.core import draft_store
+
+    draft_store.DRAFT_CACHE.clear()
+    first_id, _ = draft_store.get_or_create_draft(None, 1080, 1920)
+    second_id, script = draft_store.get_or_create_draft(first_id, 1080, 1920)
+    assert second_id == first_id
+    assert script is draft_store.DRAFT_CACHE[first_id]

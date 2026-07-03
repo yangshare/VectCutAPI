@@ -232,3 +232,23 @@ def get_draft(draft_id: str):
 def get_active_profile() -> "DraftProfile":
     """Return the currently active draft profile, resolved from config.draft_profile."""
     return get_draft_profile(_load_settings().draft_profile)
+
+
+def get_or_create_draft(draft_id: Optional[str] = None, width: int = 1080, height: int = 1920):
+    """草稿 get-or-create：draft_id 命中缓存则返回缓存对象，否则新建并入缓存。
+
+    迁自根目录 create_draft.get_or_create_draft，供 video/audio/text 等业务 service 复用。
+    """
+    import uuid
+
+    if draft_id is not None and draft_id in DRAFT_CACHE:
+        update_cache(draft_id, DRAFT_CACHE[draft_id])  # LRU 刷新
+        return draft_id, DRAFT_CACHE[draft_id]
+
+    unique_id = uuid.uuid4().hex[:8]
+    new_id = f"dfd_cat_{int(time.time())}_{unique_id}"
+    import pyJianYingDraft as draft
+
+    script = draft.Script_file(width, height)
+    update_cache(new_id, script)
+    return new_id, script
