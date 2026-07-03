@@ -1,224 +1,34 @@
-import requests
-from flask import Flask, request, jsonify, Response
-from datetime import datetime
-import pyJianYingDraft as draft
-import random
-import uuid
-import json
-import codecs
-from add_audio_track import add_audio_track
-from add_video_track import add_video_track
+from flask import Flask, request, jsonify
 from add_text_impl import add_text_impl
 from add_subtitle_impl import add_subtitle_impl
 from add_image_impl import add_image_impl
 from add_video_keyframe_impl import add_video_keyframe_impl
-from save_draft_impl import save_draft_impl, query_task_status, query_script_impl
 from add_effect_impl import add_effect_impl
 from add_sticker_impl import add_sticker_impl
-from create_draft import create_draft
-from util import generate_draft_url as utilgenerate_draft_url, hex_to_rgb
+from util import hex_to_rgb
 from pyJianYingDraft.text_segment import TextStyleRange, Text_style, Text_border
 
-from settings.local import IS_CAPCUT_ENV, DRAFT_DOMAIN, PREVIEW_ROUTER, PORT
+from settings.local import PORT
 
 app = Flask(__name__)
- 
-@app.route('/add_video', methods=['POST'])
-def add_video():
-    data = request.get_json()
-    # Get required parameters
-    draft_folder = data.get('draft_folder')
-    video_url = data.get('video_url')
-    start = data.get('start', 0)
-    end = data.get('end', 0)
-    width = data.get('width', 1080)
-    height = data.get('height', 1920)
-    draft_id = data.get('draft_id')
-    transform_y = data.get('transform_y', 0)
-    scale_x = data.get('scale_x', 1)
-    scale_y = data.get('scale_y', 1)
-    transform_x = data.get('transform_x', 0)
-    speed = data.get('speed', 1.0)  # New speed parameter
-    target_start = data.get('target_start', 0)  # New target start time parameter
-    track_name = data.get('track_name', "video_main")  # New track name parameter
-    relative_index = data.get('relative_index', 0)  # New relative index parameter
-    duration = data.get('duration')  # New duration parameter
-    transition = data.get('transition')  # New transition type parameter
-    transition_duration = data.get('transition_duration', 0.5)  # New transition duration parameter, default 0.5 seconds
-    volume = data.get('volume', 1.0)  # New volume parameter, default 1.0 
-    
-    # Get mask related parameters
-    mask_type = data.get('mask_type')  # Mask type
-    mask_center_x = data.get('mask_center_x', 0.5)  # Mask center X coordinate
-    mask_center_y = data.get('mask_center_y', 0.5)  # Mask center Y coordinate
-    mask_size = data.get('mask_size', 1.0)  # Mask size, relative to screen height
-    mask_rotation = data.get('mask_rotation', 0.0)  # Mask rotation angle
-    mask_feather = data.get('mask_feather', 0.0)  # Mask feather degree
-    mask_invert = data.get('mask_invert', False)  # Whether to invert mask
-    mask_rect_width = data.get('mask_rect_width')  # Rectangle mask width
-    mask_round_corner = data.get('mask_round_corner')  # Rectangle mask rounded corner
 
-    background_blur = data.get('background_blur')  # Background blur level, optional values: 1 (light), 2 (medium), 3 (strong), 4 (maximum), default None (no background blur)
+# —— 阶段2：draft / video / audio 三大业务路由收敛为声明式 Blueprint ——
+from vectcut.features.draft.flask_router import bp as draft_bp
+from vectcut.features.video.flask_router import bp as video_bp
+from vectcut.features.audio.flask_router import bp as audio_bp
+app.register_blueprint(draft_bp)
+app.register_blueprint(video_bp)
+app.register_blueprint(audio_bp)
 
-    result = {
-        "success": False,
-        "output": "",
-        "error": ""
-    }
-
-    # Validate required parameters
-    if not video_url:
-        error_message = "Hi, the required parameters 'video_url' are missing."
-        result["error"] = error_message
-        return jsonify(result)
-
-    try:
-        draft_result = add_video_track(
-            draft_folder=draft_folder,
-            video_url=video_url,
-            width=width,
-            height=height,
-            start=start,
-            end=end,
-            target_start=target_start,
-            draft_id=draft_id,
-            transform_y=transform_y,
-            scale_x=scale_x,
-            scale_y=scale_y,
-            transform_x=transform_x,
-            speed=speed,
-            track_name=track_name,
-            relative_index=relative_index,
-            duration=duration,
-            transition=transition,  # Pass transition type parameter
-            transition_duration=transition_duration,  # Pass transition duration parameter
-            volume=volume,  # Pass volume parameter
-            # Pass mask related parameters
-            mask_type=mask_type,
-            mask_center_x=mask_center_x,
-            mask_center_y=mask_center_y,
-            mask_size=mask_size,
-            mask_rotation=mask_rotation,
-            mask_feather=mask_feather,
-            mask_invert=mask_invert,
-            mask_rect_width=mask_rect_width,
-            mask_round_corner=mask_round_corner,
-            background_blur=background_blur
-        )
-        
-        result["success"] = True
-        result["output"] = draft_result
-        return jsonify(result)
-
-    except Exception as e:
-        error_message = f"Error occurred while processing video: {str(e)}."
-        result["error"] = error_message
-        return jsonify(result)
-
-@app.route('/add_audio', methods=['POST'])
-def add_audio():
-    data = request.get_json()
-    
-    # Get required parameters
-    draft_folder = data.get('draft_folder')
-    audio_url = data.get('audio_url')
-    start = data.get('start', 0)
-    end = data.get('end', None)
-    draft_id = data.get('draft_id')
-    volume = data.get('volume', 1.0)  # Default volume 1.0
-    target_start = data.get('target_start', 0)  # New target start time parameter
-    speed = data.get('speed', 1.0)  # New speed parameter
-    track_name = data.get('track_name', 'audio_main')  # New track name parameter
-    duration = data.get('duration', None)  # New duration parameter
-    # Get audio effect parameters separately
-    effect_type = data.get('effect_type', None)  # Audio effect type name
-    effect_params = data.get('effect_params', None)  # Audio effect parameter list
-    width = data.get('width', 1080)
-    height = data.get('height', 1920)
-    
-    # # If there are audio effect parameters, combine them into sound_effects format
-    sound_effects = None
-    if effect_type is not None:
-        sound_effects = [(effect_type, effect_params)]
-
-    result = {
-        "success": False,
-        "output": "",
-        "error": ""
-    }
-
-    # Validate required parameters
-    if not audio_url:
-        error_message = "Hi, the required parameters 'audio_url' are missing."
-        result["error"] = error_message
-        return jsonify(result)
-
-    try:
-        # Call the modified add_audio_track method
-        draft_result = add_audio_track(
-            draft_folder=draft_folder,
-            audio_url=audio_url,
-            start=start,
-            end=end,
-            target_start=target_start,
-            draft_id=draft_id,
-            volume=volume,
-            track_name=track_name,
-            speed=speed,
-            sound_effects=sound_effects,  # Add audio effect parameters
-            width=width,
-            height=height,
-            duration=duration  # Add duration parameter
-        )
-        
-        result["success"] = True
-        result["output"] = draft_result
-        return jsonify(result)
-
-    except Exception as e:
-        error_message = f"Error occurred while processing audio: {str(e)}."
-        result["error"] = error_message
-        return jsonify(result)
-
-@app.route('/create_draft', methods=['POST'])
-def create_draft_service():
-    data = request.get_json()
-    
-    # Get parameters
-    width = data.get('width', 1080)
-    height = data.get('height', 1920)
-    
-    result = {
-        "success": False,
-        "output": "",
-        "error": ""
-    }
-    
-    try:
-        # Create new draft
-        script, draft_id = create_draft(width=width, height=height)
-        
-        result["success"] = True
-        result["output"] = {
-            "draft_id": draft_id,
-            "draft_url": utilgenerate_draft_url(draft_id)
-        }
-        return jsonify(result)
-        
-    except Exception as e:
-        error_message = f"Error occurred while creating draft: {str(e)}."
-        result["error"] = error_message
-        return jsonify(result)
-        
 @app.route('/add_subtitle', methods=['POST'])
 def add_subtitle():
     data = request.get_json()
-    
+
     # Get required parameters
     srt = data.get('srt')  # Subtitle content or URL
     draft_id = data.get('draft_id')
     time_offset = data.get('time_offset', 0.0)  # Default 0 seconds
-    
+
     # Font style parameters
     font = data.get('font', "思源粗宋")
     font_size = data.get('font_size', 5.0)  # Default size 5.0
@@ -232,12 +42,12 @@ def add_subtitle():
     border_alpha = data.get('border_alpha', 1.0)
     border_color = data.get('border_color', '#000000')
     border_width = data.get('border_width', 0.0)
-    
+
     # Background parameters
     background_color = data.get('background_color', '#000000')
     background_style = data.get('background_style', 0)
     background_alpha = data.get('background_alpha', 0.0)
-        
+
     # Image adjustment parameters
     transform_x = data.get('transform_x', 0.0)  # Default 0
     transform_y = data.get('transform_y', -0.8)  # Default -0.8
@@ -291,7 +101,7 @@ def add_subtitle():
             width=width,
             height=height
         )
-        
+
         result["success"] = True
         result["output"] = draft_result
         return jsonify(result)
@@ -304,7 +114,7 @@ def add_subtitle():
 @app.route('/add_text', methods=['POST'])
 def add_text():
     data = request.get_json()
-    
+
     # Get required parameters
     text = data.get('text')
     start = data.get('start', 0)
@@ -317,21 +127,21 @@ def add_text():
     font_size = data.get('size', data.get('font_size', 8.0))  # Support both 'size' and 'font_size'
     track_name = data.get('track_name', "text_main")
     vertical = data.get('vertical', False)
-    font_alpha = data.get('alpha', data.get('font_alpha', 1.0))  # Support both 'alpha' and 'font_alpha'  
+    font_alpha = data.get('alpha', data.get('font_alpha', 1.0))  # Support both 'alpha' and 'font_alpha'
     outro_animation = data.get('outro_animation', None)
     outro_duration = data.get('outro_duration', 0.5)
     width = data.get('width', 1080)
     height = data.get('height', 1920)
-    
-    # New fixed width and height parameters 
+
+    # New fixed width and height parameters
     fixed_width = data.get('fixed_width', -1)
     fixed_height = data.get('fixed_height', -1)
-    
+
     # Border parameters
     border_alpha = data.get('border_alpha', 1.0)
     border_color = data.get('border_color', "#000000")
     border_width = data.get('border_width', 0.0)
-    
+
     # Background parameters
     background_color = data.get('background_color', "#000000")
     background_style = data.get('background_style', 0)
@@ -349,16 +159,16 @@ def add_text():
     shadow_color = data.get('shadow_color', "#000000")  # Shadow color
     shadow_distance = data.get('shadow_distance', 5.0)  # Shadow distance
     shadow_smoothing = data.get('shadow_smoothing', 0.15)  # Shadow smoothing, range 0.0-1.0
-    
+
     # Bubble and decorative text effects
     bubble_effect_id = data.get('bubble_effect_id')
     bubble_resource_id = data.get('bubble_resource_id')
     effect_effect_id = data.get('effect_effect_id')
-    
+
     # Entrance animation
     intro_animation = data.get('intro_animation')
     intro_duration = data.get('intro_duration', 0.5)
-    
+
     # Exit animation
     outro_animation = data.get('outro_animation')
     outro_duration = data.get('outro_duration', 0.5)
@@ -372,7 +182,7 @@ def add_text():
             # Get style range
             start_pos = style_data.get('start', 0)
             end_pos = style_data.get('end', 0)
-            
+
             # Create text style
             style = Text_style(
                 size=style_data.get('style',{}).get('size', font_size),
@@ -386,7 +196,7 @@ def add_text():
                 letter_spacing=style_data.get('style',{}).get('letter_spacing', 0),
                 line_spacing=style_data.get('style',{}).get('line_spacing', 0)
             )
-            
+
             # Create border (if any)
             border = None
             if style_data.get('border',{}).get('width', 0) > 0:
@@ -395,7 +205,7 @@ def add_text():
                     color=hex_to_rgb(style_data.get('border',{}).get('color', border_color)),
                     width=style_data.get('border',{}).get('width', border_width)
                 )
-            
+
             # Create style range object
             style_range = TextStyleRange(
                 start=start_pos,
@@ -404,7 +214,7 @@ def add_text():
                 border=border,
                 font_str=style_data.get('font', font)
             )
-            
+
             text_styles.append(style_range)
 
     result = {
@@ -420,7 +230,7 @@ def add_text():
         return jsonify(result)
 
     try:
-        
+
         # Call add_text_impl method
         draft_result = add_text_impl(
             text=text,
@@ -465,7 +275,7 @@ def add_text():
             fixed_height=fixed_height,
             text_styles=text_styles
         )
-        
+
         result["success"] = True
         result["output"] = draft_result
         return jsonify(result)
@@ -478,7 +288,7 @@ def add_text():
 @app.route('/add_image', methods=['POST'])
 def add_image():
     data = request.get_json()
-    
+
     # Get required parameters
     draft_folder = data.get('draft_folder')
     image_url = data.get('image_url')
@@ -492,7 +302,7 @@ def add_image():
     scale_y = data.get('scale_y', 1)
     transform_x = data.get('transform_x', 0)
     track_name = data.get('track_name', "image_main")  # Default track name
-    relative_index = data.get('relative_index', 0)  # New track rendering order index parameter 
+    relative_index = data.get('relative_index', 0)  # New track rendering order index parameter
     animation = data.get('animation')  # Entrance animation parameter (backward compatibility)
     animation_duration = data.get('animation_duration', 0.5)  # Entrance animation duration
     intro_animation = data.get('intro_animation')  # New entrance animation parameter, higher priority than animation
@@ -503,8 +313,8 @@ def add_image():
     combo_animation_duration = data.get('combo_animation_duration', 0.5)  # New combo animation duration
     transition = data.get('transition')  # Transition type parameter
     transition_duration = data.get('transition_duration', 0.5)  # Transition duration parameter, default 0.5 seconds
-    
-    # New mask related parameters 
+
+    # New mask related parameters
     mask_type = data.get('mask_type')  # Mask type
     mask_center_x = data.get('mask_center_x', 0.0)  # Mask center X coordinate
     mask_center_y = data.get('mask_center_y', 0.0)  # Mask center Y coordinate
@@ -566,7 +376,7 @@ def add_image():
             mask_round_corner=mask_round_corner,
             background_blur=background_blur
         )
-        
+
         result["success"] = True
         result["output"] = draft_result
         return jsonify(result)
@@ -579,16 +389,16 @@ def add_image():
 @app.route('/add_video_keyframe', methods=['POST'])
 def add_video_keyframe():
     data = request.get_json()
-    
+
     # Get required parameters
     draft_id = data.get('draft_id')
     track_name = data.get('track_name', 'video_main')  # Default main track
-    
+
     # Single keyframe parameters (backward compatibility)
     property_type = data.get('property_type', 'alpha')  # Default opacity
     time = data.get('time', 0.0)  # Default 0 seconds
     value = data.get('value', '1.0')  # Default value 1.0
-    
+
     # Batch keyframe parameters (new)
     property_types = data.get('property_types')  # Property type list
     times = data.get('times')  # Time list
@@ -612,7 +422,7 @@ def add_video_keyframe():
             times=times,
             values=values
         )
-        
+
         result["success"] = True
         result["output"] = draft_result
         return jsonify(result)
@@ -625,7 +435,7 @@ def add_video_keyframe():
 @app.route('/add_effect', methods=['POST'])
 def add_effect():
     data = request.get_json()
-    
+
     # Get required parameters
     effect_type = data.get('effect_type')  # Effect type name, will match from Video_scene_effect_type or Video_character_effect_type
     start = data.get('start', 0)  # Start time (seconds), default 0
@@ -662,157 +472,13 @@ def add_effect():
             width=width,
             height=height
         )
-        
+
         result["success"] = True
         result["output"] = draft_result
         return jsonify(result)
 
     except Exception as e:
         error_message = f"Error occurred while adding effect: {str(e)}. "
-        result["error"] = error_message
-        return jsonify(result)
-
-@app.route('/query_script', methods=['POST'])
-def query_script():
-    data = request.get_json()
-
-    # Get required parameters
-    draft_id = data.get('draft_id')
-    force_update = data.get('force_update', True)
-    
-    result = {
-        "success": False,
-        "output": "",
-        "error": ""
-    }
-
-    # Validate required parameters
-    if not draft_id:
-        error_message = "Hi, the required parameter 'draft_id' is missing. Please add it and try again."
-        result["error"] = error_message
-        return jsonify(result)
-
-    try:
-        # Call query_script_impl method
-        script = query_script_impl(draft_id=draft_id, force_update=force_update)
-        
-        if script is None:
-            error_message = f"Draft {draft_id} does not exist in cache."
-            result["error"] = error_message
-            return jsonify(result)
-        
-        # Convert script object to JSON serializable dictionary
-        script_str = script.dumps()
-        
-        result["success"] = True
-        result["output"] = script_str
-        return jsonify(result)
-
-    except Exception as e:
-        error_message = f"Error occurred while querying script: {str(e)}. "
-        result["error"] = error_message
-        return jsonify(result)
-
-@app.route('/save_draft', methods=['POST'])
-def save_draft():
-    data = request.get_json()
-    
-    # Get required parameters
-    draft_id = data.get('draft_id')
-    draft_folder = data.get('draft_folder')  # Draft folder parameter
-    
-    result = {
-        "success": False,
-        "output": "",
-        "error": ""
-    }
-    
-    # Validate required parameters
-    if not draft_id:
-        error_message = "Hi, the required parameter 'draft_id' is missing. Please add it and try again."
-        result["error"] = error_message
-        return jsonify(result)
-    
-    try:
-        # Call save_draft_impl method, start background task
-        draft_result = save_draft_impl(draft_id, draft_folder)
-        
-        result["success"] = True
-        result["output"] = draft_result
-        return jsonify(result)
-        
-    except Exception as e:
-        error_message = f"Error occurred while saving draft: {str(e)}. "
-        result["error"] = error_message
-        return jsonify(result)
-
-# Add new query status interface
-@app.route('/query_draft_status', methods=['POST'])
-def query_draft_status():
-    data = request.get_json()
-    
-    # Get required parameters
-    task_id = data.get('task_id')
-    
-    result = {
-        "success": False,
-        "output": "",
-        "error": ""
-    }
-    
-    # Validate required parameters
-    if not task_id:
-        error_message = "Hi, the required parameter 'task_id' is missing. Please add it and try again."
-        result["error"] = error_message
-        return jsonify(result)
-    
-    try:
-        # Get task status
-        task_status = query_task_status(task_id)
-        
-        if task_status["status"] == "not_found":
-            error_message = f"Task with ID {task_id} not found. Please check if the task ID is correct."
-            result["error"] = error_message
-            return jsonify(result)
-        
-        result["success"] = True
-        result["output"] = task_status
-        return jsonify(result)
-        
-    except Exception as e:
-        error_message = f"Error occurred while querying task status: {str(e)}."
-        result["error"] = error_message
-        return jsonify(result)
-
-@app.route('/generate_draft_url', methods=['POST'])
-def generate_draft_url():
-    data = request.get_json()
-    
-    # Get required parameters
-    draft_id = data.get('draft_id')
-    draft_folder = data.get('draft_folder')  # New draft_folder parameter
-    
-    result = {
-        "success": False,
-        "output": "",
-        "error": ""
-    }
-    
-    # Validate required parameters
-    if not draft_id:
-        error_message = "Hi, the required parameter 'draft_id' is missing. Please add it and try again."
-        result["error"] = error_message
-        return jsonify(result)
-    
-    try:
-        draft_result = { "draft_url" : f"{DRAFT_DOMAIN}{PREVIEW_ROUTER}?={draft_id}"}
-        
-        result["success"] = True
-        result["output"] = draft_result
-        return jsonify(result)
-        
-    except Exception as e:
-        error_message = f"Error occurred while saving draft: {str(e)}."
         result["error"] = error_message
         return jsonify(result)
 
