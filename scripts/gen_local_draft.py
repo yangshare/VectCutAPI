@@ -19,13 +19,16 @@ try:
 except Exception:
     pass
 
-# 确保能 import 项目根目录模块
-ROOT = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, ROOT)
+# 确保能 import 项目根目录模块（scripts/ 在项目根下，需向上两级）
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 from vectcut.features.video.service import add_video as add_video_track  # 任务6 迁 scripts/ 时重写
 from vectcut.features.audio.service import add_audio as add_audio_track  # 任务6 迁 scripts/ 时重写
 from vectcut.features.draft._save_engine import save_draft_background as save_draft_impl
+from vectcut.features.video.schemas import AddVideoRequest
+from vectcut.features.audio.schemas import AddAudioRequest
 from settings import DRAFT_FOLDER
 
 MATERIAL_ROOT = r"G:\剪映剪辑\小说素材\素材"
@@ -95,7 +98,7 @@ def main():
         # 保证不超出真实时长
         clip = min(clip, dur)
         end = clip
-        res = add_video_track(
+        res = add_video_track(AddVideoRequest(
             video_url=path,
             draft_folder=DRAFT_FOLDER,
             width=CANVAS_W,
@@ -107,7 +110,7 @@ def main():
             track_name="main",
             volume=0.0,      # 视频静音，由背景音乐接管
             draft_id=draft_id,
-        )
+        ))
         if not res.get("draft_id"):
             print(f"添加失败: {res}")
             continue
@@ -140,7 +143,7 @@ def main():
     else:
         f, d = chosen
         print(f"选用音乐: {os.path.basename(f)} (时长 {d:.1f}s)")
-        res = add_audio_track(
+        res = add_audio_track(AddAudioRequest(
             audio_url=f,
             draft_folder=DRAFT_FOLDER,
             start=0,
@@ -150,7 +153,7 @@ def main():
             track_name="bgm",
             duration=d,
             draft_id=draft_id,
-        )
+        ))
         draft_id = res["draft_id"]
         print(f"背景音乐添加完成, draft_id={draft_id}")
 

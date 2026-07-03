@@ -118,7 +118,7 @@ python mcp_server.py # 启动 MCP 协议服务，支持 stdio 通信
 
 ```bash
 # 测试 MCP 连接
-python test_mcp_client.py
+python tests/test_mcp_client.py
 
 # 预期输出
 ✅ MCP 服务器启动成功

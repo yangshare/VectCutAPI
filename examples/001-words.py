@@ -1,11 +1,15 @@
-import requests
 import json
+import os
+import requests
 from flask import Flask, request, jsonify, Response
 import sys
 import time
-import json
 
-sys.path.append('/Users/sunguannan/capcutapi')
+# 确保能从项目根目录 import example（examples/ 在项目根下，需向上一级）
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 from example import add_image_impl
 
 PORT=9001       #端口

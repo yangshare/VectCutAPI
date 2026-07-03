@@ -127,7 +127,7 @@ Create or update the `mcp_config.json` configuration file:
 
 ```bash
 # Test MCP connection
-python test_mcp_client.py
+python tests/test_mcp_client.py
 
 # Expected output
 ✅ MCP server started successfully
