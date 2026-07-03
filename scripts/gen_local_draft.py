@@ -26,9 +26,10 @@ if PROJECT_ROOT not in sys.path:
 
 from vectcut.features.video.service import add_video as add_video_track  # 任务6 迁 scripts/ 时重写
 from vectcut.features.audio.service import add_audio as add_audio_track  # 任务6 迁 scripts/ 时重写
-from vectcut.features.draft._save_engine import save_draft_background as save_draft_impl
+from vectcut.features.draft.service import save_draft as save_draft_impl
 from vectcut.features.video.schemas import AddVideoRequest
 from vectcut.features.audio.schemas import AddAudioRequest
+from vectcut.features.draft.schemas import SaveDraftRequest
 from vectcut.core.config import load_config
 
 _cfg = load_config(None)
@@ -114,10 +115,10 @@ def main():
             volume=0.0,      # 视频静音，由背景音乐接管
             draft_id=draft_id,
         ))
-        if not res.get("draft_id"):
+        if not getattr(res, "draft_id", None):
             print(f"添加失败: {res}")
             continue
-        draft_id = res["draft_id"]
+        draft_id = res.draft_id
         cursor += clip
         seg_count += 1
         print(f"  [{seg_count:02d}] +{clip:.2f}s -> {cursor:.2f}s  {os.path.basename(path)}")
@@ -157,13 +158,13 @@ def main():
             duration=d,
             draft_id=draft_id,
         ))
-        draft_id = res["draft_id"]
+        draft_id = res.draft_id
         print(f"背景音乐添加完成, draft_id={draft_id}")
 
     # 保存草稿（触发本地素材复制 + 元数据探测）
     print("\n== 保存草稿 ==")
-    save_res = save_draft_impl(draft_id, DRAFT_FOLDER)
-    print(f"保存结果: {save_res}")
+    save_res = save_draft_impl(SaveDraftRequest(draft_id=draft_id, draft_folder=DRAFT_FOLDER))
+    print(f"保存结果: success={save_res.success} draft_url={save_res.draft_url} error={save_res.error}")
 
     # 放置封面：复制一张封面图到草稿目录下的 draft_cover.jpg
     print("\n== 放置封面 ==")
