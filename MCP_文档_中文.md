@@ -1,8 +1,8 @@
-# CapCut API MCP 服务器使用文档
+# VectCut API MCP 服务器使用文档
 
 ## 概述
 
-CapCut API MCP 服务器是一个基于 Model Context Protocol (MCP) 的视频编辑服务，提供了完整的 CapCut 视频编辑功能接口。通过 MCP 协议，您可以轻松地在各种应用中集成专业级的视频编辑能力。
+VectCut API MCP 服务器是一个基于 Model Context Protocol (MCP) 的视频编辑服务，提供了完整的 CapCut 视频编辑功能接口。通过 MCP 协议，您可以轻松地在各种应用中集成专业级的视频编辑能力。
 
 ## 功能特性
 
@@ -52,12 +52,12 @@ pip install -r requirements-mcp.txt
 ```json
 {
   "mcpServers": {
-    "capcut-api": {
-      "command": "python3.10",
-      "args": ["mcp_server.py"],
-      "cwd": "/path/to/CapCutAPI-dev",
+    "vectcut": {
+      "command": "python",
+      "args": ["run_mcp.py"],
+      "cwd": ".",
       "env": {
-        "PYTHONPATH": "/path/to/CapCutAPI-dev"
+        "PYTHONPATH": "."
       }
     }
   }
@@ -195,7 +195,7 @@ python test_mcp_client.py
 ```bash
 # 启用详细日志
 export DEBUG=1
-python mcp_server.py
+python run_mcp.py
 ```
 
 ## 最佳实践

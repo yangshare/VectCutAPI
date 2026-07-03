@@ -1,8 +1,8 @@
-# CapCut API MCP Server Documentation
+# VectCut API MCP Server Documentation
 
 ## Overview
 
-The CapCut API MCP Server is a video editing service based on the Model Context Protocol (MCP), providing complete CapCut video editing functionality interfaces. Through the MCP protocol, you can easily integrate professional-grade video editing capabilities into various applications.
+The VectCut API MCP Server is a video editing service based on the Model Context Protocol (MCP), providing complete CapCut video editing functionality interfaces. Through the MCP protocol, you can easily integrate professional-grade video editing capabilities into various applications.
 
 ## Features
 
@@ -52,12 +52,12 @@ Create or update `mcp_config.json` file:
 ```json
 {
   "mcpServers": {
-    "capcut-api": {
-      "command": "python3.10",
-      "args": ["mcp_server.py"],
-      "cwd": "/path/to/CapCutAPI-dev",
+    "vectcut": {
+      "command": "python",
+      "args": ["run_mcp.py"],
+      "cwd": ".",
       "env": {
-        "PYTHONPATH": "/path/to/CapCutAPI-dev"
+        "PYTHONPATH": "."
       }
     }
   }
@@ -195,7 +195,7 @@ python test_mcp_client.py
 ```bash
 # Enable verbose logging
 export DEBUG=1
-python mcp_server.py
+python run_mcp.py
 ```
 
 ## Best Practices

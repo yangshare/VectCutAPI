@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "capcut-api"
+name = "vectcut-api"
 version = "1.0.0"
-description = "Open source CapCut API tool with MCP support"
+description = "VectCut — open source video editing API tool with MCP support"
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
@@ -40,6 +40,6 @@ mcp = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/ashreo/CapCutAPI"
-Repository = "https://github.com/ashreo/CapCutAPI.git"
-Issues = "https://github.com/ashreo/CapCutAPI/issues"
+Homepage = "https://github.com/sun-guannan/VectCutAPI"
+Repository = "https://github.com/sun-guannan/VectCutAPI.git"
+Issues = "https://github.com/sun-guannan/VectCutAPI/issues"

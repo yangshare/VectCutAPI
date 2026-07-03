@@ -85,9 +85,9 @@ cp config.json.example config.json
 ### 3. 启动服务
 
 ```bash
-python capcut_server.py # 启动HTTP API服务器, 默认端口: 9001
+python run_http.py # 启动HTTP API服务器, 默认端口: 9001
 
-python mcp_server.py # 启动 MCP 协议服务，支持 stdio 通信
+python run_mcp.py # 启动 MCP 协议服务，支持 stdio 通信
 ```
 
 ## MCP 集成指南
@@ -101,12 +101,12 @@ python mcp_server.py # 启动 MCP 协议服务，支持 stdio 通信
 ```json
 {
   "mcpServers": {
-    "capcut-api": {
-      "command": "python3",
-      "args": ["mcp_server.py"],
-      "cwd": "/path/to/VectCutAPI",
+    "vectcut": {
+      "command": "python",
+      "args": ["run_mcp.py"],
+      "cwd": ".",
       "env": {
-        "PYTHONPATH": "/path/to/VectCutAPI",
+        "PYTHONPATH": ".",
         "DEBUG": "0"
       }
     }
@@ -153,7 +153,7 @@ import requests
 
 # 添加标题文字
 response = requests.post("http://localhost:9001/add_text", json={
-    "text": "欢迎使用 CapCutAPI",
+    "text": "欢迎使用 VectCutAPI",
     "start": 0,
     "end": 5,
     "font": "思源黑体",
@@ -240,7 +240,7 @@ mcp_client.call_tool("add_text", {
 
 ### 3. 下载草稿
 
-调用 `save_draft` 会在`capcut_server.py`当前目录下生成一个 `dfd_` 开头的文件夹，将其复制到剪映/CapCut 草稿目录，即可在应用中看到生成的草稿。
+调用 `save_draft` 会在`run_http.py`当前目录下生成一个 `dfd_` 开头的文件夹，将其复制到剪映/CapCut 草稿目录，即可在应用中看到生成的草稿。
 
 ## 模版
 我们汇总了一些模版，放在`pattern`文件夹下。
@@ -278,16 +278,16 @@ mcp_client.call_tool("add_text", {
 
 <div align="center">
 
-[![Star History Chart](https://api.star-history.com/svg?repos=sun-guannan/CapCutAPI&type=Date)](https://www.star-history.com/#sun-guannan/CapCutAPI&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=sun-guannan/VectCutAPI&type=Date)](https://www.star-history.com/#sun-guannan/VectCutAPI&Date)
 
-![GitHub repo size](https://img.shields.io/github/repo-size/sun-guannan/CapCutAPI?style=flat-square)
-![GitHub code size](https://img.shields.io/github/languages/code-size/sun-guannan/CapCutAPI?style=flat-square)
-![GitHub issues](https://img.shields.io/github/issues/sun-guannan/CapCutAPI?style=flat-square)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/sun-guannan/CapCutAPI?style=flat-square)
-![GitHub last commit](https://img.shields.io/github/last-commit/sun-guannan/CapCutAPI?style=flat-square)
+![GitHub repo size](https://img.shields.io/github/repo-size/sun-guannan/VectCutAPI?style=flat-square)
+![GitHub code size](https://img.shields.io/github/languages/code-size/sun-guannan/VectCutAPI?style=flat-square)
+![GitHub issues](https://img.shields.io/github/issues/sun-guannan/VectCutAPI?style=flat-square)
+![GitHub pull requests](https://img.shields.io/github/issues-pr/sun-guannan/VectCutAPI?style=flat-square)
+![GitHub last commit](https://img.shields.io/github/last-commit/sun-guannan/VectCutAPI?style=flat-square)
 
 </div>
 
-*Made with ❤️ by the CapCutAPI Community*
+*Made with ❤️ by the VectCutAPI Community*
 
 </div>

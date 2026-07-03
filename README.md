@@ -91,9 +91,9 @@ cp config.json.example config.json
 ### 3\. Start the service
 
 ```bash
-python capcut_server.py # Start the HTTP API server, default port: 9001
+python run_http.py # Start the HTTP API server, default port: 9001
 
-python mcp_server.py # Start the MCP protocol service, supports stdio communication
+python run_mcp.py # Start the MCP protocol service, supports stdio communication
 ```
 ## Skill Integration Guide
 [Skill中文文档](https://github.com/sun-guannan/VectCutAPI/blob/main/vectcut-skill/README.md)
@@ -110,12 +110,12 @@ Create or update the `mcp_config.json` configuration file:
 ```json
 {
   "mcpServers": {
-    "capcut-api": {
-      "command": "python3",
-      "args": ["mcp_server.py"],
-      "cwd": "/path/to/VectCutAPI",
+    "vectcut": {
+      "command": "python",
+      "args": ["run_mcp.py"],
+      "cwd": ".",
       "env": {
-        "PYTHONPATH": "/path/to/VectCutAPI",
+        "PYTHONPATH": ".",
         "DEBUG": "0"
       }
     }
@@ -251,7 +251,7 @@ mcp_client.call_tool("add_text", {
 
 ### 3\. Downloading Drafts
 
-Calling `save_draft` will generate a folder starting with `dfd_` in the current directory of `capcut_server.py`. Copy this to the CapCut/Jianying drafts directory to see the generated draft in the application.
+Calling `save_draft` will generate a folder starting with `dfd_` in the current directory of `run_http.py`. Copy this to the CapCut/Jianying drafts directory to see the generated draft in the application.
 
 Draft output is selected by `draft_profile` in `config.json`:
 
@@ -285,16 +285,16 @@ We welcome contributions of all forms\! Our iteration rules are:
 
 <div align="center">
 
-[![Star History Chart](https://api.star-history.com/svg?repos=sun-guannan/CapCutAPI&type=Date)](https://www.star-history.com/#sun-guannan/CapCutAPI&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=sun-guannan/VectCutAPI&type=Date)](https://www.star-history.com/#sun-guannan/VectCutAPI&Date)
 
-![GitHub repo size](https://img.shields.io/github/repo-size/sun-guannan/CapCutAPI?style=flat-square)
-![GitHub code size](https://img.shields.io/github/languages/code-size/sun-guannan/CapCutAPI?style=flat-square)
-![GitHub issues](https://img.shields.io/github/issues/sun-guannan/CapCutAPI?style=flat-square)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/sun-guannan/CapCutAPI?style=flat-square)
-![GitHub last commit](https://img.shields.io/github/last-commit/sun-guannan/CapCutAPI?style=flat-square)
+![GitHub repo size](https://img.shields.io/github/repo-size/sun-guannan/VectCutAPI?style=flat-square)
+![GitHub code size](https://img.shields.io/github/languages/code-size/sun-guannan/VectCutAPI?style=flat-square)
+![GitHub issues](https://img.shields.io/github/issues/sun-guannan/VectCutAPI?style=flat-square)
+![GitHub pull requests](https://img.shields.io/github/issues-pr/sun-guannan/VectCutAPI?style=flat-square)
+![GitHub last commit](https://img.shields.io/github/last-commit/sun-guannan/VectCutAPI?style=flat-square)
 
 
 [![Verified on MSeeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/69c38d28-a97c-4397-849d-c3e3d241b800)
 </div>
 
-*Made with ❤️ by the CapCutAPI Community*
+*Made with ❤️ by the VectCutAPI Community*

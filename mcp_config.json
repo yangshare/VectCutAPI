@@ -1,11 +1,11 @@
 {
   "mcpServers": {
-    "capcut-api": {
-      "command": "python3.10",
-      "args": ["mcp_server.py"],
-      "cwd": "/Users/chuham/Downloads/CapCutAPI-dev",
+    "vectcut": {
+      "command": "python",
+      "args": ["run_mcp.py"],
+      "cwd": ".",
       "env": {
-        "PYTHONPATH": "/Users/chuham/Downloads/CapCutAPI-dev"
+        "PYTHONPATH": "."
       }
     }
   }
