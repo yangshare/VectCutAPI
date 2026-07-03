@@ -709,6 +709,8 @@ git commit -am "refactor(engine): 阶段5 任务10 模板资源 importlib.resour
 
 **若不执行：** 在 `docs/superpowers/plans/2026-07-03-phase5-cleanup-identity-consolidation.md` 末尾标注"任务10 暂缓，template 仍走 os.path，待引擎升级时一并处理"。
 
+> **执行决定（2026-07-03）：任务10 暂缓。** 模板目录 `template/` `template_jianying/` `template_jianying_10_2/` 仍位于项目根而非 `vectcut/` 包内，不改包结构则 `importlib.resources` 收益有限且会引入 `package-data` 跨包上跳的脆弱配置。当前 `_save_engine.py` 的 `os.path` 拼接已稳定工作，36 黄金全绿。待 pyJianYingDraft 引擎升级、模板目录一并纳入包结构时再统一改造。
+
 ---
 
 ### 任务 11：最终验收 + release 标注
