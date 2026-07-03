@@ -5,12 +5,17 @@ import requests
 import sys
 import time
 import threading
-from settings.local import PORT, DRAFT_FOLDER
+from vectcut.core.config import load_config
 
 # 确保能从项目根目录 import（examples/ 在项目根下，需向上一级）
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
+
+# 配置直读（不再经 settings 垫片，为任务8 settings 彻底瘦身清障）。
+_cfg = load_config(None)
+PORT = _cfg.port
+DRAFT_FOLDER = _cfg.draft_folder
 
 # Base URL of the service, please modify according to actual situation
 BASE_URL = f"http://localhost:{PORT}"

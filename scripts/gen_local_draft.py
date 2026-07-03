@@ -29,7 +29,10 @@ from vectcut.features.audio.service import add_audio as add_audio_track  # 任�
 from vectcut.features.draft._save_engine import save_draft_background as save_draft_impl
 from vectcut.features.video.schemas import AddVideoRequest
 from vectcut.features.audio.schemas import AddAudioRequest
-from settings import DRAFT_FOLDER
+from vectcut.core.config import load_config
+
+_cfg = load_config(None)
+DRAFT_FOLDER = _cfg.draft_folder
 
 MATERIAL_ROOT = r"G:\剪映剪辑\小说素材\素材"
 DRAFT_FOLDER = DRAFT_FOLDER or r"D:\Program Files (x86)\JianyingPro Drafts"

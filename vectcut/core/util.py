@@ -9,7 +9,14 @@ import os
 import hashlib
 import functools
 import time
-from settings.local import DRAFT_DOMAIN, PREVIEW_ROUTER, IS_CAPCUT_ENV
+from vectcut.core.config import load_config
+
+# 配置直读（不再经 settings 垫片，为任务8 settings 彻底瘦身清障）。
+# 真源：config.json → vectcut.core.config.load_config()。
+_cfg = load_config(None)
+DRAFT_DOMAIN = _cfg.draft_domain
+PREVIEW_ROUTER = _cfg.preview_router
+IS_CAPCUT_ENV = _cfg.is_capcut_env
 
 def hex_to_rgb(hex_color: str) -> tuple:
     """Convert hexadecimal color code to RGB tuple (range 0.0-1.0)"""

@@ -87,12 +87,13 @@ def test_load_config_missing_file_uses_defaults_and_does_not_raise(tmp_path):
 
 
 def test_settings_shim_reexports_legacy_constants_from_config():
-    """settings 垫片必须继续导出仍有实代码消费方的常量名且值与 config 一致：
-    IS_CAPCUT_ENV（pyJianYingDraft 引擎 + vectcut.core.util）、
-    DRAFT_DOMAIN/PREVIEW_ROUTER（vectcut.core.util.generate_draft_url）、
-    PORT/DRAFT_FOLDER（examples._client / scripts.gen_local_draft）、
-    DRAFT_PROFILE/IS_UPLOAD_DRAFT 阶段5 任务8 已删（无实代码引用，_save_engine
-    直读 load_config().is_upload_draft）。
+    """settings 垫片彻底瘦身：仅保留引擎硬依赖的 IS_CAPCUT_ENV
+    （pyJianYingDraft/video_segment.py:14、script_file.py:22）。
+
+    阶段5 任务2/8 收官：原经 settings 垫片转发的 DRAFT_DOMAIN/PREVIEW_ROUTER
+    （vectcut.core.util）、PORT/DRAFT_FOLDER（examples._client /
+    scripts.gen_local_draft）、OSS_CONFIG/MP4_OSS_CONFIG（vectcut.core.oss）
+    已全部改为各自直读 vectcut.core.config，本垫片不再转发这些常量。
     """
     import settings
     import settings.local as local
@@ -100,16 +101,24 @@ def test_settings_shim_reexports_legacy_constants_from_config():
 
     cfg = load_config(None)
 
+    # 唯一保留的常量
     assert settings.IS_CAPCUT_ENV == cfg.is_capcut_env
     assert local.IS_CAPCUT_ENV == cfg.is_capcut_env
-    assert local.DRAFT_DOMAIN == cfg.draft_domain
-    assert local.PREVIEW_ROUTER == cfg.preview_router
-    assert local.PORT == cfg.port
-    assert local.DRAFT_FOLDER == cfg.draft_folder
 
-    # 阶段5 任务8 已删的两个死常量不应再导出
-    assert not hasattr(local, "DRAFT_PROFILE")
-    assert not hasattr(local, "IS_UPLOAD_DRAFT")
+    # 彻底瘦身：以下历史常量均不再由垫片导出（消费方直读 config）
+    for dropped in (
+        "DRAFT_PROFILE",
+        "DRAFT_DOMAIN",
+        "PREVIEW_ROUTER",
+        "DRAFT_FOLDER",
+        "PORT",
+        "IS_UPLOAD_DRAFT",
+        "OSS_CONFIG",
+        "MP4_OSS_CONFIG",
+    ):
+        assert dropped not in getattr(settings, "__all__", [])
+        assert not hasattr(settings, dropped)
+        assert not hasattr(local, dropped)
 
 
 def test_settings_shim_drops_dead_code():

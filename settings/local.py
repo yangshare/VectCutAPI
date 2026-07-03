@@ -1,26 +1,15 @@
-"""配置垫片：转发到 vectcut.core.config。
+"""配置垫片：仅供引擎两处 `from settings.local import IS_CAPCUT_ENV`
+（pyJianYingDraft/video_segment.py:14、script_file.py:22）。
 
-历史：本文件曾自带 json5 加载与漂移默认值（PORT=9000 vs config.json 9001 等），
-现降级为薄转发，消除配置双轨制（规格 §1.1 问题 4 / §5.2）。
-仅保留仍有实代码消费方的模块级常量名。
-真源：config.json → vectcut.core.config.load_config()。
+阶段5 清理后，应用层全部经 vectcut.core.config 读配置，本垫片仅保留引擎
+硬依赖的 IS_CAPCUT_ENV。其余历史常量（DRAFT_PROFILE/PORT/OSS_CONFIG 等）
+随旧业务文件删除已无引用，不再转发。
 
-阶段5 任务8 瘦身：DRAFT_PROFILE / IS_UPLOAD_DRAFT 已无实代码引用
-（_save_engine.py 直读 load_config().is_upload_draft，不经此垫片），
-仅 tests/core/test_config.py 旧断言提及，已删。其余 7 个仍被
-pyJianYingDraft 引擎 / vectcut.core.util / examples._client /
-scripts.gen_local_draft / oss.py 实际 import，暂留；待任务2 迁
-oss.py 后再彻底瘦身至仅 IS_CAPCUT_ENV。
+依赖方向单一：引擎 → settings 垫片 → vectcut.core.config（真源）。
+引擎日后若升级去掉这两处 import，本垫片即可彻底删除（见 docs 标注）。
 """
-
 from vectcut.core.config import load_config
 
-_cfg = load_config(None)
+IS_CAPCUT_ENV = load_config(None).is_capcut_env
 
-IS_CAPCUT_ENV = _cfg.is_capcut_env
-DRAFT_DOMAIN = _cfg.draft_domain
-PREVIEW_ROUTER = _cfg.preview_router
-DRAFT_FOLDER = _cfg.draft_folder
-PORT = _cfg.port
-OSS_CONFIG = _cfg.oss_config.model_dump()
-MP4_OSS_CONFIG = _cfg.mp4_oss_config.model_dump()
+__all__ = ["IS_CAPCUT_ENV"]
