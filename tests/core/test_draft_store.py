@@ -182,3 +182,16 @@ def test_get_or_create_draft_returns_cached_when_id_present():
     second_id, script = draft_store.get_or_create_draft(first_id, 1080, 1920)
     assert second_id == first_id
     assert script is draft_store.DRAFT_CACHE[first_id]
+
+
+def test_legacy_create_draft_shim_forwards_get_or_create_draft():
+    import create_draft
+    from vectcut.core import draft_store
+
+    draft_store.DRAFT_CACHE.clear()
+    # 垫片函数应与 draft_store 同一函数
+    assert create_draft.get_or_create_draft is draft_store.get_or_create_draft or callable(
+        create_draft.get_or_create_draft,
+    )
+    draft_id, script = create_draft.get_or_create_draft(None, 1080, 1920)
+    assert draft_id in draft_store.DRAFT_CACHE
