@@ -34,3 +34,14 @@ def test_add_subtitle_route_missing_srt_returns_error():
     resp = _client().post("/add_subtitle", json={})
     body = resp.json()
     assert body["success"] is False
+    assert "srt" in body["error"]
+
+
+def test_add_text_route_color_alias_maps_to_font_color():
+    # color 别名应被归一化为 font_color
+    draft_store.DRAFT_CACHE.clear()
+    resp = _client().post(
+        "/add_text", json={"text": "hi", "start": 0, "end": 1, "color": "#00FF00"}
+    )
+    body = resp.json()
+    assert body["success"] is True
