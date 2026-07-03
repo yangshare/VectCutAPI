@@ -1,39 +1,33 @@
+# 通过VectCutAPI连接AI生成的一切   [在线体验](https://www.vectcut.com)
 
-# Connect AI generates via VectCutAPI [Try it online](https://www.vectcut.com)
+## 项目概览
 
-## Preview
+[流光剪辑](https://www.vectcut.com) 是一款 **toA（toAgent）** 的剪辑工具。他提供丰富的云端剪辑 API、Skill（包括添加字幕、插图、画中画、AI配音、滤镜等等功能）。
 
-**VectCut** is a **toA (toAgent)** video editing tool. It provides a rich set of cloud-based editing APIs and Skills, including features such as adding subtitles, illustrations, picture-in-picture (PiP), AI voiceovers, filters, and more.
+你可以在任意的Agent工具中使用我们的剪辑工具，不管是人工编排的工作流平台（例如**Coze, Dify, N8N**)，还是能主动计划的平台（例如**OpenClaw, Claude Code, Trae**）。从而实现你自动、批量生产视频的需求。
 
-You can integrate our editing tools into any Agent-based environment, whether it’s a manually orchestrated workflow platform (such as **Coze, Dify, or N8N**) or an autonomous planning platform (such as **OpenClaw, Claude Code, or Trae**). This enables you to meet your needs for automated and bulk video production.
+我们在github开源了接口代码，方便各个AI训练学习我们的接口。不自己微调模型，而让AI来主动学习我们的接口，（有兴趣可以点个星，让AI收录的更快🤩）
 
-We have open-sourced our interface code on GitHub, making it easy for various AI models to train on and learn our interfaces. Instead of fine-tuning models yourself, you can let the AI actively learn our API (feel free to give us a star to help AI index it even faster! 🤩).
 
-Enjoy It!  😀😀😀
+### 核心优势
 
-[中文说明](README-zh.md) 
+1. 通过API的方式，提供强大的剪辑能力
 
-### Advantages
+2. 可以在网页实时预览剪辑结果，无需下载，极大方便工作流开发。
 
-1. **API-Powered Editing:** Access all powerfull editing features, including multi-track editing and keyframe animation, through a powerful API.
+3. 可以下载剪辑结果，并导入到剪映/CapCut中二次编辑。
 
-2. **Real-Time Cloud Preview:** Instantly preview your edits on a webpage without downloads, dramatically improving your workflow.
+4. 可以利用API将剪辑结果生成视频，实现全云端操作。
 
-3. **Flexible Local Editing:** Export projects as drafts to import into CapCut or Jianying for further refinement.
-
-4. **Automated Cloud Generation:** Use the API to render and generate final videos directly in the cloud.
-
-## Demos
+## 效果展示
 
 <div align="center">
 
-**MCP, create your own editing Agent**
+**MCP,创建属于自己的剪辑Agent**
 
 [![AI Cut](https://img.youtube.com/vi/fBqy6WFC78E/hqdefault.jpg)](https://www.youtube.com/watch?v=fBqy6WFC78E)
 
-**Combine AI-generated images and videos using VectCutAPI**
-
-[More](pattern)
+**通过VectCutAPI，将AI生成的图片，视频组合起来**
 
 [![Airbnb](https://img.youtube.com/vi/1zmQWt13Dx0/hqdefault.jpg)](https://www.youtube.com/watch?v=1zmQWt13Dx0)
 
@@ -41,71 +35,68 @@ Enjoy It!  😀😀😀
 
 [![Song](https://img.youtube.com/vi/rGNLE_slAJ8/hqdefault.jpg)](https://www.youtube.com/watch?v=rGNLE_slAJ8)
 
-
 </div>
 
-## Key Features
+## 核心功能
 
-| Feature Module | API | MCP Protocol | Description |
+
+| 功能模块 | API | MCP 协议 | 描述 |
 |---------|----------|----------|------|
-| **Draft Management** | ✅ | ✅ | Create and save Jianying/CapCut draft files |
-| **Video Processing** | ✅ | ✅ | Import, clip, transition, and apply effects to multiple video formats |
-| **Audio Editing** | ✅ | ✅ | Audio tracks, volume control, sound effects processing |
-| **Image Processing** | ✅ | ✅ | Image import, animation, masks, filters |
-| **Text Editing** | ✅ | ✅ | Multi-style text, shadows, backgrounds, animations |
-| **Subtitle System** | ✅ | ✅ | SRT subtitle import, style settings, time synchronization |
-| **Effects Engine** | ✅ | ✅ | Visual effects, filters, transition animations |
-| **Sticker System** | ✅ | ✅ | Sticker assets, position control, animation effects |
-| **Keyframes** | ✅ | ✅ | Property animation, timeline control, easing functions |
-| **Media Analysis** | ✅ | ✅ | Get video duration, detect format |
+| **草稿管理** | ✅ | ✅ | 创建、保存剪映/CapCut草稿文件 |
+| **视频处理** | ✅ | ✅ | 多格式视频导入、剪辑、转场、特效 |
+| **音频编辑** | ✅ | ✅ | 音频轨道、音量控制、音效处理 |
+| **图像处理** | ✅ | ✅ | 图片导入、动画、蒙版、滤镜 |
+| **文本编辑** | ✅ | ✅ | 多样式文本、阴影、背景、动画 |
+| **字幕系统** | ✅ | ✅ | SRT 字幕导入、样式设置、时间同步 |
+| **特效引擎** | ✅ | ✅ | 视觉特效、滤镜、转场动画 |
+| **贴纸系统** | ✅ | ✅ | 贴纸素材、位置控制、动画效果 |
+| **关键帧** | ✅ | ✅ | 属性动画、时间轴控制、缓动函数 |
+| **媒体分析** | ✅ | ✅ | 视频时长获取、格式检测 |
 
-## Quick Start
+## 快速开始
 
-### 1\. System Requirements
+### 1. 系统要求
 
-  - Python 3.10+
-  - Jianying or CapCut International version
-  - FFmpeg
+- Python 3.10+
+- 剪映 或 CapCut 国际版
+- FFmpeg
 
-### 2\. Installation and Deployment
+### 2. 安装部署
 
 ```bash
-# 1. Clone the project
+# 1. 克隆项目
 git clone https://github.com/sun-guannan/VectCutAPI.git
 cd VectCutAPI
 
-# 2. Create a virtual environment (recommended)
+# 2. 创建虚拟环境 (推荐)
 python -m venv venv-capcut
 source venv-capcut/bin/activate  # Linux/macOS
-# or venv-capcut\Scripts\activate  # Windows
+# 或 venv-capcut\Scripts\activate  # Windows
 
-# 3. Install dependencies
-pip install -r requirements.txt      # HTTP API basic dependencies
-pip install -r requirements-mcp.txt  # MCP protocol support (optional)
+# 3. 安装依赖
+pip install -r requirements.txt      # HTTP API 基础依赖
+pip install -r requirements-mcp.txt  # MCP 协议支持 (可选)
 
-# 4. Configuration file
+# 4. 配置文件
 cp config.json.example config.json
-# Edit config.json as needed
+# 根据需要编辑 config.json
 ```
 
-### 3\. Start the service
+### 3. 启动服务
 
 ```bash
-python run_http.py # Start the HTTP API server, default port: 9001
+python run_http.py # 启动HTTP API服务器, 默认端口: 9001
 
-python run_mcp.py # Start the MCP protocol service, supports stdio communication
+python run_mcp.py # 启动 MCP 协议服务，支持 stdio 通信
 ```
-## Skill Integration Guide
-[Skill中文文档](https://github.com/sun-guannan/VectCutAPI/blob/main/vectcut-skill/README.md)
-[Skill Guide](https://github.com/sun-guannan/VectCutAPI/blob/main/vectcut-skill/README_EN.md)
 
-## MCP Integration Guide
+## MCP 集成指南
 
-[MCP 中文文档](https://www.google.com/search?q=./MCP_%E6%96%87%E6%A1%A3_%E4%B8%AD%E6%96%87.md) • [MCP English Guide](https://www.google.com/search?q=./MCP_Documentation_English.md)
+[MCP 文档](MCP_文档.md) 
 
-### 1\. Client Configuration
+### 1. 客户端配置
 
-Create or update the `mcp_config.json` configuration file:
+创建或更新 `mcp_config.json` 配置文件：
 
 ```json
 {
@@ -123,28 +114,27 @@ Create or update the `mcp_config.json` configuration file:
 }
 ```
 
-### 2\. Connection Test
+### 2. 连接测试
 
 ```bash
-# Test MCP connection
+# 测试 MCP 连接
 python tests/test_mcp_client.py
 
-# Expected output
-✅ MCP server started successfully
-✅ Got 11 available tools
-✅ Draft creation test passed
+# 预期输出
+✅ MCP 服务器启动成功
+✅ 获取到 11 个可用工具
+✅ 草稿创建测试通过
 ```
 
-## Usage Examples
+## 使用示例
 
-### 1\. API Example
-
-Add video material
+### 1. API 示例
+添加视频素材
 
 ```python
 import requests
 
-# Add background video
+# 添加背景视频
 response = requests.post("http://localhost:9001/add_video", json={
     "video_url": "https://example.com/background.mp4",
     "start": 0,
@@ -153,44 +143,44 @@ response = requests.post("http://localhost:9001/add_video", json={
     "transition": "fade_in"
 })
 
-print(f"Video addition result: {response.json()}")
+print(f"视频添加结果: {response.json()}")
 ```
 
-Create stylized text
+创建样式文本
 
 ```python
 import requests
 
-# Add title text
+# 添加标题文字
 response = requests.post("http://localhost:9001/add_text", json={
-    "text": "Welcome to VectCutAPI",
+    "text": "欢迎使用 VectCutAPI",
     "start": 0,
     "end": 5,
-    "font": "Source Han Sans",read
+    "font": "思源黑体",
     "font_color": "#FFD700",
     "font_size": 48,
     "shadow_enabled": True,
     "background_color": "#000000"
 })
 
-print(f"Text addition result: {response.json()}")
+print(f"文本添加结果: {response.json()}")
 ```
 
-More examples can be found in the `example.py` file.
+可以在`example.py`文件中获取更多示例。
 
-### 2\. MCP Protocol Example
+### 2. MCP 协议示例
 
-Complete workflow
+完整工作流程
 
 ```python
-# 1. Create a new project
+# 1. 创建新项目
 draft = mcp_client.call_tool("create_draft", {
     "width": 1080,
     "height": 1920
 })
 draft_id = draft["result"]["draft_id"]
 
-# 2. Add background video
+# 2. 添加背景视频
 mcp_client.call_tool("add_video", {
     "video_url": "https://example.com/bg.mp4",
     "draft_id": draft_id,
@@ -199,9 +189,9 @@ mcp_client.call_tool("add_video", {
     "volume": 0.6
 })
 
-# 3. Add title text
+# 3. 添加标题文字
 mcp_client.call_tool("add_text", {
-    "text": "AI-Driven Video Production",
+    "text": "AI 驱动的视频制作",
     "draft_id": draft_id,
     "start": 1,
     "end": 6,
@@ -210,7 +200,7 @@ mcp_client.call_tool("add_text", {
     "background_color": "#1E1E1E"
 })
 
-# 4. Add keyframe animation
+# 4. 添加关键帧动画
 mcp_client.call_tool("add_video_keyframe", {
     "draft_id": draft_id,
     "track_name": "main",
@@ -219,20 +209,19 @@ mcp_client.call_tool("add_video_keyframe", {
     "values": ["1.0", "1.2", "0.8"]
 })
 
-# 5. Save the project
+# 5. 保存项目
 result = mcp_client.call_tool("save_draft", {
     "draft_id": draft_id
 })
 
-print(f"Project saved: {result['result']['draft_url']}")
+print(f"项目已保存: {result['result']['draft_url']}")
 ```
-
-Advanced text effects
+高级文本效果
 
 ```python
-# Multi-style colored text
+# 多样式彩色文本
 mcp_client.call_tool("add_text", {
-    "text": "Colored text effect demonstration",
+    "text": "彩色文字效果展示",
     "draft_id": draft_id,
     "start": 2,
     "end": 8,
@@ -249,37 +238,41 @@ mcp_client.call_tool("add_text", {
 })
 ```
 
-### 3\. Downloading Drafts
+### 3. 下载草稿
 
-Calling `save_draft` will generate a folder starting with `dfd_` in the current directory of `run_http.py`. Copy this to the CapCut/Jianying drafts directory to see the generated draft in the application.
+调用 `save_draft` 会在`run_http.py`当前目录下生成一个 `dfd_` 开头的文件夹，将其复制到剪映/CapCut 草稿目录，即可在应用中看到生成的草稿。
 
-Draft output is selected by `draft_profile` in `config.json`:
+## 模版
+我们汇总了一些模版，放在`pattern`文件夹下。
 
-- `capcut_legacy`: existing CapCut template.
-- `jianying_legacy`: existing Jianying template.
-- `jianying_pro_10`: Jianying Pro 10.x Windows-style folder layout using `draft_content.json`.
+## 社区与支持
 
-## Pattern
+我们欢迎各种形式的贡献！我们的迭代规则：
 
-You can find a lot of pattern in the `pattern` directory.
+- 禁止直接向main提交pr
+- 可以向dev分支提交pr
+- 每周一从dev合并到main分支，并发版
 
-## Community & Support
 
-We welcome contributions of all forms\! Our iteration rules are:
+## 进群交流
+![交流群](https://github.com/user-attachments/assets/aa98d6d8-590e-4fcf-9e95-d87d71601def)
 
-  - No direct PRs to main
-  - PRs can be submitted to the dev branch
-  - Merges from dev to main and releases will happen every Monday
 
-## Contact Us
 
-### 🤝 Collaboration
+- 反馈问题
+- 功能建议
+- 最新消息
 
-  - **Video Production**: Want to use this API for batch production of videos with AIGC? 
+### 🤝 合作机会
 
-  - **Join us**: Our goal is to provide a stable and reliable video editing tool that integrates well with AI-generated images, videos, and audio. If you are interested, submit a PR and I'll see it. For more in-depth involvement, the code for the MCP Editing Agent, web-based editing client, and cloud rendering modules has not been open-sourced yet.
+- **出海视频制作**: 想要利用这个API批量制作出海视频吗？我提供免费的咨询服务，帮助你利用这个API制作。相应的，我要将制作的工作流模板放到这个项目中的template目录中**开源**出来。
 
-**Contact**: abelchrisnic@gmail.com
+- **加入我们**: 我们的目标是提供稳定可靠的视频剪辑工具，方便融合AI生成的图片/视频/语音。如果你有兴趣，可以先从将工程里的中文翻译成英文开始！提交pr，我会看到。更深入的，还有MCP剪辑Agent, web剪辑端，云渲染这三个模块代码还没有开源出来。
+
+- **联系方式**:
+  - 微信：sguann
+  - 抖音：剪映草稿助手
+
 
 ## 📈 Star History
 
@@ -293,8 +286,8 @@ We welcome contributions of all forms\! Our iteration rules are:
 ![GitHub pull requests](https://img.shields.io/github/issues-pr/sun-guannan/VectCutAPI?style=flat-square)
 ![GitHub last commit](https://img.shields.io/github/last-commit/sun-guannan/VectCutAPI?style=flat-square)
 
-
-[![Verified on MSeeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/69c38d28-a97c-4397-849d-c3e3d241b800)
 </div>
 
 *Made with ❤️ by the VectCutAPI Community*
+
+</div>
