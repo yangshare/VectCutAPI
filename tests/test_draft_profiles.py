@@ -3,8 +3,6 @@ import shutil
 from types import SimpleNamespace
 from pathlib import Path
 
-import pytest
-
 
 def test_jianying_10_profile_uses_versioned_template_and_content_names():
     from draft_profiles import get_draft_profile

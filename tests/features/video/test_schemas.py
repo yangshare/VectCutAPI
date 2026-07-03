@@ -1,4 +1,4 @@
-from vectcut.features.video.schemas import AddVideoRequest, AddVideoResponse, AddVideoKeyframeRequest
+from vectcut.features.video.schemas import AddVideoRequest, AddVideoKeyframeRequest
 
 
 def test_add_video_request_defaults():

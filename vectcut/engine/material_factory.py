@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Optional, Tuple
 
 import pyJianYingDraft as draft
-from pyJianYingDraft import Clip_settings, exceptions, trange
+from pyJianYingDraft import exceptions
 
 from util import build_draft_asset_path
 from vectcut.engine import adapter

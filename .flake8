@@ -1,5 +1,10 @@
 [flake8]
 extend-ignore = E301, E302, E303, E305, E306, E701, F403, F405
+per-file-ignores =
+    # _save_engine.py 逐字保真迁自根目录 save_draft_impl.py（长行/续行属源文件既有形态，阶段2不拆行）
+    vectcut/features/draft/_save_engine.py:E501,E128
+    # capcut_server.py 阶段3 路由（add_text/image 等）逐字保留自原文件，E231/E501/E261/E402 为既有风格债，阶段3 迁移时统一清理
+    capcut_server.py:E231,E251,E501,E261,E402
 exclude =
     .git,
     __pycache__,

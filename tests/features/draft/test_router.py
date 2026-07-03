@@ -5,7 +5,6 @@ import pytest
 def client(monkeypatch):
     from flask import Flask
     from vectcut.features.draft.flask_router import bp
-    from vectcut.features.draft import service
 
     app = Flask(__name__)
     app.register_blueprint(bp)

@@ -1,9 +1,9 @@
 from vectcut.features.draft.schemas import (
-    CreateDraftRequest, CreateDraftResponse,
-    SaveDraftRequest, SaveDraftResponse,
-    QueryScriptRequest, QueryScriptResponse,
-    QueryDraftStatusRequest, QueryDraftStatusResponse,
-    GenerateDraftUrlRequest, GenerateDraftUrlResponse,
+    CreateDraftRequest,
+    SaveDraftRequest,
+    QueryScriptRequest,
+    QueryDraftStatusRequest,
+    GenerateDraftUrlRequest,
 )
 
 

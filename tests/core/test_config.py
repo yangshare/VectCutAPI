@@ -1,8 +1,6 @@
 import json
 from pathlib import Path
 
-import pytest
-
 
 def _write_config(tmp_path: Path, **overrides) -> Path:
     """生成一份最小合法 config.json（JSON5，带注释）。"""

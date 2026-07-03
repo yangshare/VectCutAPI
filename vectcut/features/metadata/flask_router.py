@@ -10,7 +10,6 @@ from flask import Blueprint, jsonify
 
 from vectcut.core.errors import VectCutError
 from vectcut.features.metadata import service
-from vectcut.features.metadata.registry import META_KINDS
 
 bp = Blueprint("metadata", __name__)
 

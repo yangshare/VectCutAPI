@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import imageio.v2 as imageio
 
 from downloader import download_file  # 阶段5再迁 downloader
-import save_task_cache  # 纯内存 LRU，独立模块，本阶段不迁（测试需通过 _save_engine.save_task_cache 访问）
+import save_task_cache  # noqa: F401  纯内存 LRU，测试经 _save_engine.save_task_cache 访问
 from save_task_cache import (  # 单函数别名
     get_task_status,
     update_task_field,
@@ -455,7 +455,7 @@ def update_media_metadata(script, task_id=None):
                             video.width = 1920
                             video.height = 1080
                     else:
-                        logger.warning(f"Warning: Could not find JSON data in ffprobe output.")
+                        logger.warning("Warning: Could not find JSON data in ffprobe output.")
                         # Set default values
                         video.width = 1920
                         video.height = 1080

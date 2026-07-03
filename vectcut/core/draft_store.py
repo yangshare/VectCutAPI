@@ -17,7 +17,7 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, List, Optional
 
 
 # ============================================================================
@@ -25,11 +25,11 @@ from typing import Dict, Iterable, List, Optional
 # ============================================================================
 
 # Modify global variable, use OrderedDict to implement LRU cache, limit the maximum number to 10000
-DRAFT_CACHE: Dict[str, "draft.Script_file"] = OrderedDict()  # Use Dict for type hinting
+DRAFT_CACHE: Dict[str, "draft.Script_file"] = OrderedDict()  # Use Dict for type hinting  # noqa: F821
 MAX_CACHE_SIZE = 10000
 
 
-def update_cache(key: str, value: "draft.Script_file") -> None:
+def update_cache(key: str, value: "draft.Script_file") -> None:  # noqa: F821
     """Update LRU cache"""
     if key in DRAFT_CACHE:
         # If the key exists, delete the old item
