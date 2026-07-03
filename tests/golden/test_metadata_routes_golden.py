@@ -39,12 +39,9 @@ METADATA_ROUTES = [
 
 @pytest.fixture(scope="module")
 def client():
-    """启动现有 Flask app 的测试客户端。本阶段 capcut_server 未动。"""
-    # 延迟 import，避免收集期副作用
-    import capcut_server
-
-    capcut_server.app.config["TESTING"] = True
-    with capcut_server.app.test_client() as c:
+    from fastapi.testclient import TestClient
+    from vectcut.server.http.app import app
+    with TestClient(app) as c:
         yield c
 
 
@@ -52,7 +49,7 @@ def client():
 def test_metadata_route_matches_golden(client, route, snapshot_dir, regenerate_golden):
     resp = client.get(route)
     assert resp.status_code == 200
-    payload = resp.get_json()
+    payload = resp.json()
 
     # 规范化：output 列表按 JSON 序列化排序，消除枚举遍历顺序漂移，
     # 但**保留每个 item 的完整结构**（audio_effect 含 {name,type,params}，必须原样留存，

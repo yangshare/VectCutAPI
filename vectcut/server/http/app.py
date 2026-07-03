@@ -1,8 +1,12 @@
-"""FastAPI app + envelope helper + 全局异常 handler。
+"""FastAPI app + 全局异常 handler。
 
 保真约束：所有路由响应体恒为 200 + {success, output, error}（与现有 Flask
 flask_router.py 外壳逐字一致，黄金测试 assert status_code==200 是硬约束）。
 规格 §4.4 的语义状态码（422/404）列为本阶段非目标。
+
+注意：本文件不 import 任何 feature router（避免循环依赖）。
+router 挂载由 vectcut/server/http/__init__.py 在 app 创建后执行。
+_wire_exception_handlers 保留在此处，供 feature router 测试 import。
 """
 from __future__ import annotations
 
@@ -11,22 +15,14 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from vectcut.core.errors import VectCutError
+from vectcut.server._helpers import envelope_err, envelope_ok  # noqa: F401
 
 
-def envelope_ok(output) -> dict:
-    return {"success": True, "output": output, "error": ""}
-
-
-def envelope_err(error: str) -> dict:
-    return {"success": False, "output": "", "error": error}
-
-
-def _wire_exception_handlers(app: FastAPI) -> None:
+def _wire_exception_handlers(app: FastAPI) -> FastAPI:
     """把 VectCutError / ValidationError / 兜底异常统一转成 200 外壳。
 
     抽成函数以便测试在独立 sub-app 上复用同一套 handler。
-    注意：TestClient 默认 raise_server_exceptions=True 会 re-raise 未处理异常，
-    测试需用 raise_server_exceptions=False 以验证兜底 Exception handler 返回 200 外壳。
+    返回 app 以便链式调用。
     """
 
     @app.exception_handler(VectCutError)
@@ -35,7 +31,6 @@ def _wire_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error_handler(_req: Request, exc: RequestValidationError):
-        # 保真：与 flask_router.py 的 ValidationError 分支文案前缀一致
         return JSONResponse(
             status_code=200,
             content=envelope_err(f"Hi, the required parameters are missing. {exc}"),
@@ -45,6 +40,7 @@ def _wire_exception_handlers(app: FastAPI) -> None:
     async def _unexpected_error_handler(_req: Request, exc: Exception):
         return JSONResponse(status_code=200, content=envelope_err(str(exc)))
 
+    return app
 
-app = FastAPI(title="VectCutAPI")
-_wire_exception_handlers(app)
+
+app = _wire_exception_handlers(FastAPI(title="VectCutAPI"))

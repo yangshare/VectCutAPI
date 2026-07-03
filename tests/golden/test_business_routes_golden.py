@@ -7,6 +7,8 @@ import json
 import re
 
 import pytest
+from fastapi.testclient import TestClient
+
 
 # (路由, 请求体, 快照名)
 CASES = [
@@ -27,9 +29,8 @@ CASES = [
 
 @pytest.fixture(scope="module")
 def client():
-    import capcut_server
-    capcut_server.app.config["TESTING"] = True
-    with capcut_server.app.test_client() as c:
+    from vectcut.server.http.app import app
+    with TestClient(app) as c:
         yield c
 
 
@@ -47,7 +48,7 @@ def _normalize(payload):
 def test_business_route_matches_golden(client, route, body, snap, snapshot_dir, regenerate_golden):
     resp = client.post(route, json=body)
     assert resp.status_code == 200
-    payload = resp.get_json()
+    payload = resp.json()
     normalized = _normalize(payload)
     snap_path = snapshot_dir / f"{snap}.json"
     if regenerate_golden:

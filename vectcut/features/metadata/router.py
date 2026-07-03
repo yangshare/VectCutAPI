@@ -1,13 +1,15 @@
 """metadata feature FastAPI router：GET /metadata/{kind} + 12 旧别名。
 
 保真：与 flask_router.py 路由集合、输出外壳逐字一致。
+使用 try/except 处理 service 异常（kind 非法 → InvalidParam）。
 """
 from __future__ import annotations
 
 from fastapi import APIRouter
 
+from vectcut.core.errors import VectCutError
 from vectcut.features.metadata import service
-from vectcut.server.http.app import envelope_ok, envelope_err
+from vectcut.server._helpers import envelope_ok, envelope_err
 
 router = APIRouter()
 
@@ -31,6 +33,8 @@ _KIND_TO_ALIAS = {
 def metadata_by_kind(kind: str):
     try:
         return envelope_ok(service.list_metadata(kind))
+    except VectCutError as e:
+        return envelope_err(str(e))
     except Exception as e:
         return envelope_err(str(e))
 
@@ -40,6 +44,8 @@ def _register_alias(kind: str, alias: str) -> None:
     def _alias():
         try:
             return envelope_ok(service.list_metadata(kind))
+        except VectCutError as e:
+            return envelope_err(str(e))
         except Exception as e:
             return envelope_err(str(e))
 
