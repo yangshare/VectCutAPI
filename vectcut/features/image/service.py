@@ -15,7 +15,7 @@ from vectcut.engine import material_factory as mf
 from vectcut.engine.material_factory import BLUR_MAP
 from vectcut.features.draft.service import generate_draft_url
 from vectcut.features.image.schemas import AddImageRequest, AddImageResponse
-from util import url_to_hash
+from vectcut.core.util import url_to_hash
 
 
 def add_image(req: AddImageRequest) -> AddImageResponse:
@@ -49,7 +49,7 @@ def add_image(req: AddImageRequest) -> AddImageResponse:
     # build_photo_material 内部据 draft_folder 自行 build_draft_asset_path
     draft_image_path = None
     if req.draft_folder:
-        from util import build_draft_asset_path
+        from vectcut.core.util import build_draft_asset_path
         draft_image_path = build_draft_asset_path(req.draft_folder, draft_id, "image", material_name)
         print("replace_path:", draft_image_path)
 

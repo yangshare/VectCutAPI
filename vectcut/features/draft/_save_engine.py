@@ -25,7 +25,7 @@ from save_task_cache import (  # 单函数别名
     update_task_fields,
     update_tasks_cache,
 )
-from util import build_draft_asset_path, zip_draft
+from vectcut.core.util import build_draft_asset_path, zip_draft
 from oss import upload_to_oss
 from vectcut.core.config import load_config
 from vectcut.core.draft_store import DRAFT_CACHE, get_active_profile, write_profile_content

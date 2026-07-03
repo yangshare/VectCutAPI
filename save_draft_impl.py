@@ -1,7 +1,7 @@
 import os
 import pyJianYingDraft as draft
 import shutil
-from util import zip_draft, build_draft_asset_path
+from vectcut.core.util import zip_draft, build_draft_asset_path
 from oss import upload_to_oss
 from typing import Dict, Literal
 from draft_cache import DRAFT_CACHE

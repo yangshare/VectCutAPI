@@ -12,7 +12,7 @@ from typing import Optional, Tuple
 import pyJianYingDraft as draft
 from pyJianYingDraft import exceptions
 
-from util import build_draft_asset_path
+from vectcut.core.util import build_draft_asset_path
 from vectcut.engine import adapter
 
 

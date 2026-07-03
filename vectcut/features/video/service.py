@@ -19,7 +19,7 @@ from vectcut.features.video.schemas import (
     AddVideoRequest,
     AddVideoResponse,
 )
-from util import url_to_hash
+from vectcut.core.util import url_to_hash
 
 
 def add_video(req: AddVideoRequest) -> AddVideoResponse:

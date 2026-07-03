@@ -9,7 +9,7 @@ from vectcut.core.draft_store import get_or_create_draft
 from vectcut.engine import material_factory as mf
 from vectcut.features.audio.schemas import AddAudioRequest, AddAudioResponse
 from vectcut.features.draft.service import generate_draft_url
-from util import url_to_hash
+from vectcut.core.util import url_to_hash
 
 
 def add_audio(req: AddAudioRequest) -> AddAudioResponse:

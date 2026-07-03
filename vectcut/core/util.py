@@ -1,6 +1,9 @@
+"""Utility functions for VectCut.
+
+Migrated from root util.py (阶段5 任务1).
+Function implementations are unchanged; only the module location moved.
+"""
 import shutil
-import subprocess
-import json
 import re
 import os
 import hashlib
@@ -52,20 +55,20 @@ def zip_draft(draft_id):
 def url_to_hash(url, length=16):
     """
     Convert URL to a fixed-length hash string (without extension)
-    
+
     Parameters:
     - url: Original URL string
     - length: Length of the hash string (maximum 64, default 16)
-    
+
     Returns:
     - Hash string (e.g.: 3a7f9e7d9a1b4e2d)
     """
     # Ensure URL is bytes type
     url_bytes = url.encode('utf-8')
-    
+
     # Use SHA-256 to generate hash (secure and highly unique)
     hash_object = hashlib.sha256(url_bytes)
-    
+
     # Truncate to specified length of hexadecimal string
     return hash_object.hexdigest()[:length]
 

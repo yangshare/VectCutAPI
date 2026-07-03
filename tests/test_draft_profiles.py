@@ -92,7 +92,7 @@ def test_windows_draft_asset_path_keeps_drive_root():
 
 
 def test_shared_draft_asset_path_keeps_drive_root():
-    from util import build_draft_asset_path
+    from vectcut.core.util import build_draft_asset_path
 
     assert build_draft_asset_path(
         r"D:\JianyingPro Drafts",

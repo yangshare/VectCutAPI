@@ -24,7 +24,7 @@ from vectcut.features.text.schemas import (
     AddTextRequest,
     AddTextResponse,
 )
-from util import hex_to_rgb
+from vectcut.core.util import hex_to_rgb
 
 
 def add_text(req: AddTextRequest) -> AddTextResponse:
