@@ -2,7 +2,7 @@
 
 ## 项目概览
 
-[流光剪辑](https://www.vectcut.com) 是一款 **toA（toAgent）** 的剪辑工具。他提供丰富的云端剪辑 API、Skill（包括添加字幕、插图、画中画、AI配音、滤镜等等功能）。
+[VectCutAPI](https://www.vectcut.com) 是一款 **toA（toAgent）** 的剪辑工具。他提供丰富的云端剪辑 API、Skill（包括添加字幕、插图、画中画、AI配音、滤镜等等功能）。
 
 你可以在任意的Agent工具中使用我们的剪辑工具，不管是人工编排的工作流平台（例如**Coze, Dify, N8N**)，还是能主动计划的平台（例如**OpenClaw, Claude Code, Trae**）。从而实现你自动、批量生产视频的需求。
 
@@ -166,7 +166,7 @@ response = requests.post("http://localhost:9001/add_text", json={
 print(f"文本添加结果: {response.json()}")
 ```
 
-可以在`example.py`文件中获取更多示例。
+更多示例请查看 `examples/` 目录。
 
 ### 2. MCP 协议示例
 
@@ -242,8 +242,6 @@ mcp_client.call_tool("add_text", {
 
 调用 `save_draft` 会在`run_http.py`当前目录下生成一个 `dfd_` 开头的文件夹，将其复制到剪映/CapCut 草稿目录，即可在应用中看到生成的草稿。
 
-## 模版
-我们汇总了一些模版，放在`pattern`文件夹下。
 
 ## 社区与支持
 
@@ -254,40 +252,6 @@ mcp_client.call_tool("add_text", {
 - 每周一从dev合并到main分支，并发版
 
 
-## 进群交流
-![交流群](https://github.com/user-attachments/assets/aa98d6d8-590e-4fcf-9e95-d87d71601def)
-
-
-
-- 反馈问题
-- 功能建议
-- 最新消息
-
-### 🤝 合作机会
-
-- **出海视频制作**: 想要利用这个API批量制作出海视频吗？我提供免费的咨询服务，帮助你利用这个API制作。相应的，我要将制作的工作流模板放到这个项目中的template目录中**开源**出来。
-
-- **加入我们**: 我们的目标是提供稳定可靠的视频剪辑工具，方便融合AI生成的图片/视频/语音。如果你有兴趣，可以先从将工程里的中文翻译成英文开始！提交pr，我会看到。更深入的，还有MCP剪辑Agent, web剪辑端，云渲染这三个模块代码还没有开源出来。
-
-- **联系方式**:
-  - 微信：sguann
-  - 抖音：剪映草稿助手
-
-
-## 📈 Star History
-
-<div align="center">
-
-[![Star History Chart](https://api.star-history.com/svg?repos=sun-guannan/VectCutAPI&type=Date)](https://www.star-history.com/#sun-guannan/VectCutAPI&Date)
-
-![GitHub repo size](https://img.shields.io/github/repo-size/sun-guannan/VectCutAPI?style=flat-square)
-![GitHub code size](https://img.shields.io/github/languages/code-size/sun-guannan/VectCutAPI?style=flat-square)
-![GitHub issues](https://img.shields.io/github/issues/sun-guannan/VectCutAPI?style=flat-square)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/sun-guannan/VectCutAPI?style=flat-square)
-![GitHub last commit](https://img.shields.io/github/last-commit/sun-guannan/VectCutAPI?style=flat-square)
-
-</div>
 
 *Made with ❤️ by the VectCutAPI Community*
 
-</div>
