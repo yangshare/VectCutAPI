@@ -1,0 +1,5 @@
+{
+  "error": "Hi, the required parameters 'srt' are missing. 1 validation error for AddSubtitleRequest\nsrt\n  Field required [type=missing, input_value={}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.12/v/missing",
+  "output": "",
+  "success": false
+}

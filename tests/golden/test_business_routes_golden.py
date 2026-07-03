@@ -16,6 +16,12 @@ CASES = [
     ("/save_draft", {}, "business_save_draft_missing"),
     ("/add_video", {}, "business_add_video_missing_url"),
     ("/add_audio", {}, "business_add_audio_missing_url"),
+    ("/add_video_keyframe", {}, "business_add_video_keyframe_missing"),
+    ("/add_effect", {}, "business_add_effect_missing_type"),
+    ("/add_sticker", {}, "business_add_sticker_missing_id"),
+    ("/add_image", {}, "business_add_image_missing_url"),
+    ("/add_text", {}, "business_add_text_missing"),
+    ("/add_subtitle", {}, "business_add_subtitle_missing"),
 ]
 
 
