@@ -31,7 +31,7 @@
 ### 核心优势
 
 - **无缝集成** - Claude Code 自动识别并加载技能
-- **完整封装** - 支持 VectCutAPI 的所有 35+ 个 HTTP 接口和 11 个 MCP 工具
+- **完整封装** - 已实现 13 个 POST 接口 + 元数据查询（含 12 个别名，共 26 个 HTTP 路由）、MCP 12 个工具（详见 [api_reference.md](skill/references/api_reference.md)）
 - **Python 客户端** - 提供优雅的 Python API 封装
 - **丰富示例** - 包含 8+ 种常见工作流示例代码
 - **双协议支持** - 同时支持 HTTP REST 和 MCP 协议

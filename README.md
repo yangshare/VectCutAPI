@@ -53,6 +53,14 @@
 | **关键帧** | ✅ | ✅ | 属性动画、时间轴控制、缓动函数 |
 | **媒体分析** | ✅ | ✅ | 视频时长获取、格式检测 |
 
+## API 文档
+
+完整的接口清单、请求参数与实现状态请查看：
+
+👉 [vectcut-skill/skill/references/api_reference.md](vectcut-skill/skill/references/api_reference.md)
+
+该文档按功能分类列出全部 HTTP 路由与 MCP 工具，并为每个接口标注实现状态（✅ 已实现 / 🔲 规划中）。HTTP 与 MCP 为双入口，共用同一套 `features.*.service` 业务层，但两边工具集**不完全对称**——MCP 独有 `get_video_duration`，HTTP 独有 `query_script` / `query_draft_status` / 元数据查询系列，详见文档内说明。
+
 ## 快速开始
 
 ### 1. 系统要求
