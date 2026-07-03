@@ -3,1003 +3,1003 @@
   "output": [
     {
       "name": "Autotune",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强度",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强度"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "Lofi",
-      "params": [],
-      "type": "Speech_to_song"
+      "type": "Speech_to_song",
+      "params": []
     },
     {
       "name": "TVB女声",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "_3d环绕音",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强度",
           "default_value": 0.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强度"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "_8bit",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "change_voice_param_pitch_shift",
           "default_value": 50.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "change_voice_param_pitch_shift"
+          "max_value": 100.0
         },
         {
+          "name": "change_voice_param_timbre",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "change_voice_param_timbre"
+          "max_value": 100.0
         },
         {
+          "name": "change_voice_param_strength",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "change_voice_param_strength"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "下雨",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "strength",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "strength"
+          "max_value": 100.0
         },
         {
+          "name": "noise",
           "default_value": 74.3,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "noise"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "东厂公公",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "乡村大喇叭",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强度",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强度"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "云龙哥",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "人声增强",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强弱",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强弱"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "低保真",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强弱",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强弱"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "低音增强",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "change_voice_param_strength",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "change_voice_param_strength"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "侠客",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "做作夹子音",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "停车场",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "strength",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "strength"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "八戒",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "军事解说",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "冰川之下",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "strength",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "strength"
+          "max_value": 100.0
         },
         {
+          "name": "noise",
           "default_value": 74.3,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "noise"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "刮风",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "strength",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "strength"
+          "max_value": 100.0
         },
         {
+          "name": "noise",
           "default_value": 74.3,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "noise"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "动漫小新",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "动漫海绵",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "台湾小哥",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "合成器",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强弱",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强弱"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "咆哮哥",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "商务殷语",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "嘻哈",
-      "params": [],
-      "type": "Speech_to_song"
+      "type": "Speech_to_song",
+      "params": []
     },
     {
       "name": "噪音混响",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "strength",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "strength"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "四郎",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "回音",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "change_voice_param_quantity",
           "default_value": 80.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "change_voice_param_quantity"
+          "max_value": 100.0
         },
         {
+          "name": "change_voice_param_strength",
           "default_value": 76.2,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "change_voice_param_strength"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "圣诞精灵",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "圣诞老人",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "地狱",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "strength",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "strength"
+          "max_value": 100.0
         },
         {
+          "name": "noise",
           "default_value": 74.3,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "noise"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "复古收音机",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强度",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强度"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "大叔",
+      "type": "Tone",
       "params": [
         {
+          "name": "音调",
           "default_value": 83.39999999999999,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "音调"
+          "max_value": 100.0
         },
         {
+          "name": "音色",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "音色"
+          "max_value": 100.0
         }
-      ],
-      "type": "Tone"
+      ]
     },
     {
       "name": "太白",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "失真电子",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强度",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强度"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "女生",
+      "type": "Tone",
       "params": [
         {
+          "name": "音调",
           "default_value": 83.39999999999999,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "音调"
+          "max_value": 100.0
         },
         {
+          "name": "音色",
           "default_value": 33.4,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "音色"
+          "max_value": 100.0
         }
-      ],
-      "type": "Tone"
+      ]
     },
     {
       "name": "如来佛祖",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "姜饼人",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "容嬷嬷",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "对讲机",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强度",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强度"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "小孩",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "广告男声",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "强势妹",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "快板",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "怪物",
+      "type": "Tone",
       "params": [
         {
+          "name": "音调",
           "default_value": 65.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "音调"
+          "max_value": 100.0
         },
         {
+          "name": "音色",
           "default_value": 78.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "音色"
+          "max_value": 100.0
         }
-      ],
-      "type": "Tone"
+      ]
     },
     {
       "name": "恐怖电影",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "悬疑解说",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "懒小羊",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "房间",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强度",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强度"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "扩音器",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强弱",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强弱"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "捂嘴",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "strength",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "strength"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "搞笑解说",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "教堂",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强度",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强度"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "教室",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强度",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强度"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "文艺女声",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "机器人",
+      "type": "Tone",
       "params": [
         {
+          "name": "强弱",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强弱"
+          "max_value": 100.0
         }
-      ],
-      "type": "Tone"
+      ]
     },
     {
       "name": "机器人2",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "strength",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "strength"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "樱桃丸子",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "樱花小哥",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "武则天",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "民谣",
-      "params": [],
-      "type": "Speech_to_song"
+      "type": "Speech_to_song",
+      "params": []
     },
     {
       "name": "水下",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "深度",
           "default_value": 50.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "深度"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "沉稳解说",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "沙漠",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "strength",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "strength"
+          "max_value": 100.0
         },
         {
+          "name": "noise",
           "default_value": 74.3,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "noise"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "没电了",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强弱",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强弱"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "派对",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "strength",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "strength"
+          "max_value": 100.0
         },
         {
+          "name": "noise",
           "default_value": 74.3,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "noise"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "深海回声",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强度",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强度"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "温柔姐姐",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "港普男声",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "熊二",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "爵士",
-      "params": [],
-      "type": "Speech_to_song"
+      "type": "Speech_to_song",
+      "params": []
     },
     {
       "name": "猴哥",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "环绕音",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "change_voice_param_center_position",
           "default_value": 50.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "change_voice_param_center_position"
+          "max_value": 100.0
         },
         {
+          "name": "change_voice_param_surrounding_frequency",
           "default_value": 50.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "change_voice_param_surrounding_frequency"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "甜美悦悦",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "生活小妙招",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "电竞解说",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "电视广告",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "电话",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强弱",
           "default_value": 70.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强弱"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "电音",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强弱",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强弱"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "男生",
+      "type": "Tone",
       "params": [
         {
+          "name": "音调",
           "default_value": 37.5,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "音调"
+          "max_value": 100.0
         },
         {
+          "name": "音色",
           "default_value": 25.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "音色"
+          "max_value": 100.0
         }
-      ],
-      "type": "Tone"
+      ]
     },
     {
       "name": "留声机",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强度",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强度"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "百老汇",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "strength",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "strength"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "空灵感",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强度",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强度"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "空谷回声",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强度",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强度"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "紫薇",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "老婆婆",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "老式电话",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强度",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强度"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "舌尖解说",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "节奏蓝调",
-      "params": [],
-      "type": "Speech_to_song"
+      "type": "Speech_to_song",
+      "params": []
     },
     {
       "name": "花栗鼠",
+      "type": "Tone",
       "params": [
         {
+          "name": "音调",
           "default_value": 50.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "音调"
+          "max_value": 100.0
         },
         {
+          "name": "音色",
           "default_value": 50.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "音色"
+          "max_value": 100.0
         }
-      ],
-      "type": "Tone"
+      ]
     },
     {
       "name": "萝莉",
+      "type": "Tone",
       "params": [
         {
+          "name": "音调",
           "default_value": 75.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "音调"
+          "max_value": 100.0
         },
         {
+          "name": "音色",
           "default_value": 60.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "音色"
+          "max_value": 100.0
         }
-      ],
-      "type": "Tone"
+      ]
     },
     {
       "name": "蜡笔小妮",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "解说小帅",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "言灵术",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "strength",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "strength"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "语音助手",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "豪宅回声",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强度",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强度"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "迷幻电子",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "strength",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "strength"
+          "max_value": 100.0
         },
         {
+          "name": "noise",
           "default_value": 74.3,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "noise"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "那姐",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "锤子哥",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "雷鬼",
-      "params": [],
-      "type": "Speech_to_song"
+      "type": "Speech_to_song",
+      "params": []
     },
     {
       "name": "顾姐",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     },
     {
       "name": "颤音",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "频率",
           "default_value": 71.39999999999999,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "频率"
+          "max_value": 100.0
         },
         {
+          "name": "幅度",
           "default_value": 90.5,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "幅度"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "麦霸",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "空间大小",
           "default_value": 5.2,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "空间大小"
+          "max_value": 100.0
         },
         {
+          "name": "强弱",
           "default_value": 45.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强弱"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "黑胶",
+      "type": "Audio_scene",
       "params": [
         {
+          "name": "强弱",
           "default_value": 100.0,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "强弱"
+          "max_value": 100.0
         },
         {
+          "name": "噪点",
           "default_value": 74.3,
-          "max_value": 100.0,
           "min_value": 0.0,
-          "name": "噪点"
+          "max_value": 100.0
         }
-      ],
-      "type": "Audio_scene"
+      ]
     },
     {
       "name": "黛玉",
-      "params": [],
-      "type": "Tone"
+      "type": "Tone",
+      "params": []
     }
   ],
   "error": ""

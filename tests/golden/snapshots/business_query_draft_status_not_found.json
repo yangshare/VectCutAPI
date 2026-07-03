@@ -1,12 +1,12 @@
 {
-  "error": "",
+  "success": true,
   "output": {
-    "completed_files": 0,
-    "draft_url": "",
+    "status": "not_found",
     "message": "Task does not exist",
     "progress": 0,
-    "status": "not_found",
-    "total_files": 0
+    "completed_files": 0,
+    "total_files": 0,
+    "draft_url": ""
   },
-  "success": true
+  "error": ""
 }

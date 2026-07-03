@@ -1,5 +1,5 @@
 {
-  "error": "Error occurred while saving draft: 1 validation error for SaveDraftRequest\ndraft_id\n  Field required [type=missing, input_value={}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.12/v/missing. ",
+  "success": false,
   "output": "",
-  "success": false
+  "error": "Error occurred while saving draft: 1 validation error for SaveDraftRequest\ndraft_id\n  Field required [type=missing, input_value={}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing. "
 }

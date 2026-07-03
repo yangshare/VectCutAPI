@@ -1,5 +1,5 @@
 {
-  "error": "Hi, the required parameters are missing. 1 validation error for AddEffectRequest\neffect_type\n  Field required [type=missing, input_value={}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.12/v/missing",
+  "success": false,
   "output": "",
-  "success": false
+  "error": "Hi, the required parameters are missing. 1 validation error for AddEffectRequest\neffect_type\n  Field required [type=missing, input_value={}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing"
 }

@@ -1,8 +1,8 @@
 {
-  "error": "",
+  "success": true,
   "output": {
     "draft_id": "dfd_cat_PLACEHOLDER",
     "draft_url": "https://www.capcutapi.top/draft/downloader?draft_id=dfd_cat_PLACEHOLDER&is_capcut=0"
   },
-  "success": true
+  "error": ""
 }
