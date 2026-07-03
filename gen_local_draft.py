@@ -23,9 +23,9 @@ except Exception:
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 
-from add_video_track import add_video_track
-from add_audio_track import add_audio_track
-from save_draft_impl import save_draft_impl
+from vectcut.features.video.service import add_video as add_video_track  # 任务6 迁 scripts/ 时重写
+from vectcut.features.audio.service import add_audio as add_audio_track  # 任务6 迁 scripts/ 时重写
+from vectcut.features.draft._save_engine import save_draft_background as save_draft_impl
 from settings import DRAFT_FOLDER
 
 MATERIAL_ROOT = r"G:\剪映剪辑\小说素材\素材"

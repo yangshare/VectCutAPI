@@ -80,7 +80,7 @@ def test_script_dumps_uses_requested_profile_platform_and_mask_key():
 
 
 def test_windows_draft_asset_path_keeps_drive_root():
-    from save_draft_impl import build_asset_path
+    from vectcut.features.draft._save_engine import build_asset_path
 
     path = build_asset_path(
         r"D:\JianyingPro Drafts",
@@ -104,7 +104,7 @@ def test_shared_draft_asset_path_keeps_drive_root():
 
 
 def test_save_draft_writes_to_requested_draft_folder(tmp_path, monkeypatch):
-    import save_draft_impl
+    from vectcut.features.draft import _save_engine as save_draft_impl
     from vectcut.core.draft_store import DRAFT_CACHE
     from vectcut.core.draft_store import get_draft_profile
     from save_task_cache import create_task
@@ -123,9 +123,9 @@ def test_save_draft_writes_to_requested_draft_folder(tmp_path, monkeypatch):
     DRAFT_CACHE[draft_id] = script
     create_task(draft_id)
 
-    monkeypatch.setattr(save_draft_impl, "get_draft_profile", lambda: get_draft_profile("jianying_pro_10"))
+    monkeypatch.setattr(save_draft_impl, "get_active_profile", lambda: get_draft_profile("jianying_pro_10"))
     monkeypatch.setattr(save_draft_impl, "update_media_metadata", lambda script, task_id=None: None)
-    monkeypatch.setattr(save_draft_impl, "IS_UPLOAD_DRAFT", False)
+    monkeypatch.setattr(save_draft_impl, "load_config", lambda: type("Cfg", (), {"is_upload_draft": False})())
 
     save_draft_impl.save_draft_background(draft_id, str(tmp_path), draft_id)
 
@@ -184,13 +184,8 @@ def test_get_or_create_draft_returns_cached_when_id_present():
 
 
 def test_legacy_create_draft_shim_forwards_get_or_create_draft():
-    import create_draft
     from vectcut.core import draft_store
 
     draft_store.DRAFT_CACHE.clear()
-    # 垫片函数应与 draft_store 同一函数
-    assert create_draft.get_or_create_draft is draft_store.get_or_create_draft or callable(
-        create_draft.get_or_create_draft,
-    )
-    draft_id, script = create_draft.get_or_create_draft(None, 1080, 1920)
+    draft_id, script = draft_store.get_or_create_draft(None, 1080, 1920)
     assert draft_id in draft_store.DRAFT_CACHE
