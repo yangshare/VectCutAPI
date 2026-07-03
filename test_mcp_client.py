@@ -59,7 +59,7 @@ def main():
     # 启动MCP服务器
     try:
         process = subprocess.Popen(
-            [sys.executable, "mcp_server.py"],  # 修改为正确的文件名
+            [sys.executable, "run_mcp.py"],  # 修改为正确的文件名
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -67,7 +67,7 @@ def main():
             bufsize=0  # 无缓冲
         )
         
-        print("✅ MCP服务器已启动 (mcp_server.py)")
+        print("✅ MCP服务器已启动 (run_mcp.py)")
         time.sleep(1)  # 等待服务器启动
         
         # 1. 初始化
