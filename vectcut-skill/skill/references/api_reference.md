@@ -80,7 +80,7 @@
 
 | 参数 | 类型 | 必需 | 说明 |
 |------|------|------|------|
-| draft_id | string | 是 | 草稿 ID |
+| task_id | string | 是 | 任务 ID |
 
 ---
 
@@ -155,31 +155,32 @@
 | background_blur | int | - | 背景模糊级别(1-4) |
 
 **转场类型 (transition):**
-- `fade_in` - 淡入
-- `fade_out` - 淡出
-- `wipe_left` - 左擦除
-- `wipe_right` - 右擦除
-- `wipe_up` - 上擦除
-- `wipe_down` - 下擦除
-- 更多类型见 `/get_transition_types`
+
+> ⚠️ 枚举值为**中文**（`Transition_type`，共 361 个成员）。传英文（如 `fade_in`、`wipe_left`）会触发 `Unsupported transition type`。
+
+- `叠化` - 最常用转场（基础混合）
+- `万花筒`、`中心旋转`、`三屏放大`
+- `上移` / `下滑` / `左移` / `右移`
+- 完整列表见 `/get_transition_types` 或 `/metadata/transition`
 
 **蒙版类型 (mask_type):**
-- `circle` - 圆形蒙版
-- `rect` - 矩形蒙版
-- `linear` - 线性蒙版
-- 更多类型见 `/get_mask_types`
+
+> ⚠️ 枚举值为**中文**（`Mask_type`，共 6 个成员）。传英文（如 `circle`、`rect`）会触发 `Unsupported mask type`。
+
+- `圆形` / `矩形` / `线性` / `星形` / `爱心` / `镜面`
+- 完整列表见 `/get_mask_types` 或 `/metadata/mask`
 
 **示例:**
 
 ```python
-# 添加带淡入转场的视频
+# 添加带「叠化」转场的视频
 requests.post("http://localhost:9001/add_video", json={
     "draft_id": draft_id,
     "video_url": "https://example.com/video.mp4",
     "start": 5,
     "end": 15,
     "target_start": 0,
-    "transition": "fade_in",
+    "transition": "叠化",
     "transition_duration": 0.8,
     "volume": 0.7
 })
@@ -209,10 +210,15 @@ requests.post("http://localhost:9001/add_video", json={
 | width | int | 1080 | 项目宽度 |
 | height | int | 1920 | 项目高度 |
 
-**音频特效类型:**
-- 混响效果 (Tone_effect_type)
-- 场景特效 (Audio_scene_effect_type)
-- 语音转歌曲 (Speech_to_song_type)
+**音频特效类型 (effect_type):**
+
+> ⚠️ 枚举值为**中文**，按三类子枚举遍历匹配（`resolve_audio_effect` 自动跨子类型查找）：
+
+- **人声/音色特效** (`Tone_effect_type`，57 个)：如 `TVB女声`、`侠客`、`做作夹子音`
+- **场景特效** (`Audio_scene_effect_type`，41 个)：如 `Autotune`、`下雨`、`低保真`、`人声增强`
+- **语音转歌曲** (`Speech_to_song_type`，6 个)：如 `Lofi`、`嘻哈`、`爵士`、`节奏蓝调`
+
+完整列表见 `/get_audio_effect_types`（或 `/metadata/audio_effect`）。`effect_params` 为 `List[Optional[float]]`。
 
 ---
 
@@ -226,16 +232,30 @@ requests.post("http://localhost:9001/add_video", json={
 |------|------|--------|------|
 | draft_id | string | 必需 | 草稿 ID |
 | image_url | string | 必需 | 图片 URL |
-| start | float | 必需 | 开始时间 |
-| end | float | 必需 | 结束时间 |
-| target_start | float | 0 | 在时间轴上的开始时间 |
-| scale_x | float | 1.0 | 水平缩放 |
-| scale_y | float | 1.0 | 垂直缩放 |
+| start | float | 0 | 开始时间 |
+| end | float | 3.0 | 结束时间 |
 | transform_x | float | 0 | 水平位置偏移 |
 | transform_y | float | 0 | 垂直位置偏移 |
-| animation_type | string | - | 动画类型 |
-| transition | string | - | 转场类型 |
-| mask_type | string | - | 蒙版类型 |
+| scale_x | float | 1.0 | 水平缩放 |
+| scale_y | float | 1.0 | 垂直缩放 |
+| track_name | string | "image_main" | 轨道名称 |
+| relative_index | int | 0 | 相对索引 |
+| animation | string | - | 组合动画（`Group_animation_type`，中文枚举） |
+| animation_duration | float | 0.5 | 组合动画时长(秒) |
+| intro_animation | string | - | 入场动画（`Intro_type`，中文枚举） |
+| intro_animation_duration | float | 0.5 | 入场动画时长(秒) |
+| outro_animation | string | - | 出场动画（`Outro_type`，中文枚举） |
+| outro_animation_duration | float | 0.5 | 出场动画时长(秒) |
+| combo_animation | string | - | 组合动画（备用字段） |
+| transition | string | - | 转场（`Transition_type`，中文枚举） |
+| transition_duration | float | 0.5 | 转场时长(秒) |
+| mask_type | string | - | 蒙版（`Mask_type`，中文枚举） |
+| mask_center_x / mask_center_y | float | 0.0 | 蒙版中心 |
+| mask_size | float | 0.5 | 蒙版大小 |
+| mask_rotation | float | 0.0 | 蒙版旋转 |
+| mask_feather | float | 0.0 | 蒙版羽化 |
+| mask_invert | bool | False | 是否反转蒙版 |
+| background_blur | int | - | 背景模糊级别(1-4) |
 
 ---
 
@@ -249,46 +269,54 @@ requests.post("http://localhost:9001/add_video", json={
 |------|------|--------|------|
 | draft_id | string | 必需 | 草稿 ID |
 | text | string | 必需 | 文字内容 |
-| start | float | 必需 | 开始时间 |
-| end | float | 必需 | 结束时间 |
-| target_start | float | 0 | 在时间轴上的开始时间 |
-| font | string | "思源黑体" | 字体名称 |
-| font_size | int | 32 | 字体大小 |
-| font_color | string | "#FFFFFF" | 字体颜色 (HEX) |
-| stroke_enabled | bool | False | 是否启用描边 |
-| stroke_color | string | "#FFFFFF" | 描边颜色 |
-| stroke_width | float | 2.0 | 描边宽度 |
-| stroke_alpha | float | 1.0 | 描边透明度 |
+| start | float | 0 | 开始时间 |
+| end | float | 5 | 结束时间 |
+| font | string | "文轩体" | 字体（`Font_type` 枚举名，可选） |
+| font_size | float | 8.0 | 字体大小 |
+| font_color | string | "#FF0000" | 字体颜色 (HEX) |
+| font_alpha | float | 1.0 | 字体透明度 (0.0-1.0) |
+| vertical | bool | False | 是否竖排 |
+| transform_x | float | 0 | 水平位置偏移 |
+| transform_y | float | 0 | 垂直位置偏移 |
+| border_color | string | "#000000" | 描边颜色 |
+| border_width | float | 0.0 | 描边宽度（>0 启用） |
+| border_alpha | float | 1.0 | 描边透明度 |
+| background_color | string | "#000000" | 背景颜色 |
+| background_alpha | float | 0.0 | 背景透明度（>0 启用） |
+| background_style | int | 0 | 背景样式 |
+| background_round_radius | float | 0.0 | 背景圆角半径 |
+| background_width | float | 0.14 | 背景宽度 |
+| background_height | float | 0.14 | 背景高度 |
+| background_horizontal_offset | float | 0.5 | 背景水平偏移 |
+| background_vertical_offset | float | 0.5 | 背景垂直偏移 |
 | shadow_enabled | bool | False | 是否启用阴影 |
+| shadow_alpha | float | 0.9 | 阴影透明度 |
+| shadow_angle | float | -45.0 | 阴影角度 |
 | shadow_color | string | "#000000" | 阴影颜色 |
-| shadow_angle | float | 0 | 阴影角度 |
-| shadow_distance | float | 0 | 阴影距离 |
-| shadow_smooth | float | 0 | 阴影平滑度 |
-| background_color | string | - | 背景颜色 |
-| background_alpha | float | 1.0 | 背景透明度 |
-| background_round_radius | float | 0 | 背景圆角半径 |
-| background_width | float | 0 | 背景宽度 |
-| background_height | float | 0 | 背景高度 |
-| text_intro | string | - | 入场动画 |
-| text_outro | string | - | 出场动画 |
-| is_bold | bool | False | 是否加粗 |
-| is_italic | bool | False | 是否斜体 |
-| text_styles | array | - | 多样式文字 |
-| track_name | string | "text" | 轨道名称 |
-| alignment_h | string | "center" | 水平对齐 |
-| alignment_v | string | "middle" | 垂直对齐 |
-| pos_x | float | 0 | X 位置 |
-| pos_y | float | 0 | Y 位置 |
+| shadow_distance | float | 5.0 | 阴影距离 |
+| shadow_smoothing | float | 0.15 | 阴影平滑度 |
+| intro_animation | string | - | 入场动画（中文枚举，见下方） |
+| intro_duration | float | 0.5 | 入场动画时长(秒) |
+| outro_animation | string | - | 出场动画（中文枚举，见下方） |
+| outro_duration | float | 0.5 | 出场动画时长(秒) |
+| text_styles | array | - | 多样式文字（`List[TextStyleRangeSpec]`，见示例） |
+| track_name | string | "text_main" | 轨道名称 |
+| width | int | 1080 | 项目宽度 |
+| height | int | 1920 | 项目高度 |
+| fixed_width | float | -1 | 固定宽度（>0 启用，按比例） |
+| fixed_height | float | -1 | 固定高度（>0 启用，按比例） |
 
-**文字动画类型 (text_intro/text_outro):**
-- `fade_in` / `fade_out` - 淡入/淡出
-- `slide_in_left` / `slide_out_left` - 左滑入/滑出
-- `slide_in_right` / `slide_out_right` - 右滑入/滑出
-- `zoom_in` / `zoom_out` - 缩放入/出
-- `rotate_in` / `rotate_out` - 旋转入/出
-- 更多类型见 `/get_text_intro_types`
+**文字动画类型 (intro_animation/outro_animation):**
+
+> ⚠️ 枚举值为**中文**（`Text_intro` 144 个 / `Text_outro` 97 个成员）。传英文会触发 `Unsupported ... animation type`。
+
+- 入场：`乱码故障`、`二段缩放`、`倒数`、`兔子弹跳`、`冰雪飘动`
+- 出场：`发光闪出`、`叠影并出`、`右上弹出`、`向上擦除`
+- 完整列表见 `/get_text_intro_types`、`/get_text_outro_types`（或 `/metadata/text_intro`、`/metadata/text_outro`）
 
 **多样式文字示例:**
+
+> ⚠️ `text_styles` 每项是 `TextStyleRangeSpec`，颜色/字号等样式需嵌套在 `style` 字段内（`TextStyleSpec`）。直接用 `font_color` 会被忽略，且当 `style` 为 `None` 时访问 `.alpha` 会抛 `'NoneType' object has no attribute 'alpha'`。
 
 ```python
 requests.post("http://localhost:9001/add_text", json={
@@ -298,9 +326,9 @@ requests.post("http://localhost:9001/add_text", json={
     "end": 8,
     "font_size": 42,
     "text_styles": [
-        {"start": 0, "end": 2, "font_color": "#FF6B6B"},
-        {"start": 2, "end": 4, "font_color": "#4ECDC4"},
-        {"start": 4, "end": 6, "font_color": "#45B7D1"}
+        {"start": 0, "end": 2, "style": {"color": "#FF6B6B"}},
+        {"start": 2, "end": 4, "style": {"color": "#4ECDC4"}},
+        {"start": 4, "end": 6, "style": {"color": "#45B7D1"}}
     ]
 })
 ```
@@ -316,16 +344,25 @@ requests.post("http://localhost:9001/add_text", json={
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | draft_id | string | 必需 | 草稿 ID |
-| srt_url | string | 必需 | SRT 文件 URL |
-| font | string | "思源黑体" | 字体名称 |
-| font_size | int | 32 | 字体大小 |
-| font_color | string | "#FFFFFF" | 字体颜色 |
-| stroke_enabled | bool | True | 是否启用描边 |
-| stroke_color | string | "#000000" | 描边颜色 |
-| stroke_width | float | 3.0 | 描边宽度 |
-| background_alpha | float | 0.5 | 背景透明度 |
-| pos_y | float | -0.3 | 垂直位置 |
-| time_offset | float | 0 | 时间偏移(秒) |
+| srt | string | 必需 | SRT 内容，支持三种来源：HTTP(S) URL / 本地文件路径 / 内联 SRT 文本 |
+| font | string | "思源粗宋" | 字体（可选） |
+| font_size | float | 5.0 | 字体大小 |
+| font_color | string | "#FFFFFF" | 字体颜色 (HEX) |
+| alpha | float | 1.0 | 字体透明度 |
+| bold / italic / underline | bool | False | 加粗/斜体/下划线 |
+| vertical | bool | False | 是否竖排 |
+| border_color | string | "#000000" | 描边颜色 |
+| border_width | float | 0.0 | 描边宽度（>0 启用） |
+| border_alpha | float | 1.0 | 描边透明度 |
+| background_color | string | "#000000" | 背景颜色 |
+| background_style | int | 0 | 背景样式 |
+| background_alpha | float | 0.0 | 背景透明度（>0 启用） |
+| transform_x | float | 0.0 | 水平位置偏移 |
+| transform_y | float | -0.8 | 垂直位置偏移 |
+| scale_x / scale_y | float | 1.0 | 水平/垂直缩放 |
+| rotation | float | 0.0 | 旋转角度 |
+| time_offset | float | 0.0 | 时间偏移(秒) |
+| track_name | string | "subtitle" | 轨道名称 |
 
 **SRT 文件格式:**
 
@@ -350,17 +387,19 @@ requests.post("http://localhost:9001/add_text", json={
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | draft_id | string | 必需 | 草稿 ID |
-| sticker_id | string | 必需 | 贴纸 ID |
-| start | float | 必需 | 开始时间 |
-| end | float | 必需 | 结束时间 |
-| target_start | float | 0 | 在时间轴上的开始时间 |
-| scale_x | float | 1.0 | 水平缩放 |
-| scale_y | float | 1.0 | 垂直缩放 |
+| sticker_id | string | 必需 | 贴纸资源 ID（对应引擎 `resource_id`） |
+| start | float | 0 | 开始时间 |
+| end | float | 5.0 | 结束时间 |
 | transform_x | float | 0 | 水平位置偏移 |
 | transform_y | float | 0 | 垂直位置偏移 |
+| scale_x | float | 1.0 | 水平缩放 |
+| scale_y | float | 1.0 | 垂直缩放 |
+| rotation | float | 0.0 | 旋转角度 |
+| alpha | float | 1.0 | 透明度 |
 | flip_horizontal | bool | False | 水平翻转 |
 | flip_vertical | bool | False | 垂直翻转 |
-| alpha | float | 1.0 | 透明度 |
+| track_name | string | "sticker_main" | 轨道名称 |
+| relative_index | int | 0 | 相对索引 |
 
 ---
 
@@ -373,16 +412,21 @@ requests.post("http://localhost:9001/add_text", json={
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | draft_id | string | 必需 | 草稿 ID |
-| effect_type | string | 必需 | 特效类型 |
-| start | float | 必需 | 开始时间 |
-| end | float | 必需 | 结束时间 |
-| target_start | float | 0 | 在时间轴上的开始时间 |
-| intensity | float | 1.0 | 特效强度 |
-| effect_params | list | - | 特效参数 |
+| effect_type | string | 必需 | 特效类型（中文枚举，见下方） |
+| effect_category | string | "scene" | 特效类别：`"scene"`(场景) / `"character"`(角色)，须与 effect_type 匹配 |
+| start | float | 0 | 开始时间 |
+| end | float | 3.0 | 结束时间 |
+| track_name | string | "effect_01" | 轨道名称 |
+| params | list | - | 特效参数（`List[Optional[float]]`） |
 
 **特效类型分类:**
-- 场景特效 (Video_scene_effect_type)
-- 角色特效 (Video_character_effect_type)
+
+> ⚠️ `effect_type` 枚举值为**中文**，且按 `effect_category` 分两套枚举（须匹配类别）：
+
+- **场景特效** (`effect_category="scene"`，`Video_scene_effect_type`，909 个成员)：如 `DV录制框`、`DV界面`、`Ins描边`、`Bling飘落`
+- **角色特效** (`effect_category="character"`，`Video_character_effect_type`，226 个成员)：如 `主体冲破屏幕`、`九尾狐`、`X瞬移`、`BOOM`
+
+完整列表见 `/get_video_scene_effect_types`、`/get_video_character_effect_types`（或 `/metadata/video_scene_effect`、`/metadata/video_character_effect`）。
 
 ---
 
@@ -396,28 +440,32 @@ requests.post("http://localhost:9001/add_text", json={
 |------|------|--------|------|
 | draft_id | string | 必需 | 草稿 ID |
 | track_name | string | "video_main" | 轨道名称 |
-| property_types | list | 必需 | 属性类型列表 |
-| times | list | 必需 | 关键帧时间点 |
-| values | list | 必需 | 对应属性值 |
+| property_types | list | 必需 | 批量模式：属性类型列表（与 times/values 等长，按位置 zip） |
+| times | list | 必需 | 批量模式：关键帧时间点列表 |
+| values | list | 必需 | 批量模式：属性值列表（**每项单值字符串**，如 `"1.0"`，非复合 `"1.0,1.0,1.0"`） |
+| property_type | string | "alpha" | 单关键帧模式：属性类型 |
+| time | float | 0.0 | 单关键帧模式：时间点 |
+| value | string | "1.0" | 单关键帧模式：属性值 |
 
-**支持的属性类型:**
-- `scale_x` - 水平缩放
-- `scale_y` - 垂直缩放
-- `rotation` - 旋转角度
-- `alpha` - 透明度
-- `transform_x` - 水平位置
-- `transform_y` - 垂直位置
+> 批量模式与单关键帧模式二选一：传 `property_types`/`times`/`values` 走批量，否则回退到 `property_type`/`time`/`value`。
+
+**支持的属性类型 (Keyframe_property):**
+- `scale_x` / `scale_y` / `uniform_scale` - 缩放
+- `position_x` / `position_y` - 位置（范围 -10~10）
+- `rotation` - 旋转（可选 `deg` 后缀，如 `"45deg"`）
+- `alpha` / `volume` - 透明度/音量（可选 `%` 后缀，如 `"80%"`）
+- `brightness` / `contrast` / `saturation` - 亮度/对比度/饱和度（前缀 `+`/`-`）
 
 **示例:**
 
 ```python
-# 创建缩放和透明度动画
+# 在 t=0/2/4 分别为 scale_x / scale_y / alpha 打关键帧
 requests.post("http://localhost:9001/add_video_keyframe", json={
     "draft_id": draft_id,
     "track_name": "video_main",
     "property_types": ["scale_x", "scale_y", "alpha"],
     "times": [0, 2, 4],
-    "values": ["1.0,1.0,1.0", "1.2,1.2,0.8", "0.8,0.8,1.0"]
+    "values": ["1.0", "1.2", "0.8"]
 })
 ```
 
