@@ -41,6 +41,8 @@ def _normalize(payload):
     s = re.sub(r'dfd_cat_\d+_[0-9a-f]+', 'dfd_cat_PLACEHOLDER', s)
     # 引擎内部 uuid（materials / segments IDs 等）
     s = re.sub(r'\b[0-9a-f]{32}\b', 'PLACEHOLDER_UUID', s)
+    # Pydantic 错误帮助链接包含本机安装的小版本号，不属于业务输出契约。
+    s = re.sub(r'https://errors\.pydantic\.dev/\d+\.\d+/', 'https://errors.pydantic.dev/PYDANTIC_VERSION/', s)
     return json.loads(s)
 
 
@@ -55,5 +57,5 @@ def test_business_route_matches_golden(client, route, body, snap, snapshot_dir, 
         snap_path.write_text(json.dumps(normalized, ensure_ascii=False, indent=2), encoding="utf-8")
         pytest.skip(f"golden regenerated: {snap_path.name}")
     assert snap_path.exists(), f"快照缺失：{snap_path}。运行 REGENERATE_GOLDEN=1 生成。"
-    expected = json.loads(snap_path.read_text(encoding="utf-8"))
+    expected = _normalize(json.loads(snap_path.read_text(encoding="utf-8")))
     assert normalized == expected, f"{route} 输出与黄金基线不一致（见 {snap_path.name}）"

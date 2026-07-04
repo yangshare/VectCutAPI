@@ -9,7 +9,7 @@
 >
 > 状态依据：`vectcut/server/http/__init__.py`（HTTP 路由挂载）与 `vectcut/server/mcp/registry.py`（MCP 工具注册表）。HTTP 与 MCP 是双入口，两边的工具集**并不完全对称**（详见文末「MCP 工具清单」）。
 >
-> **HTTP 路由实现总览**：13 个 POST + 1 个统一 GET 入口 `/metadata/{kind}` + 12 个 GET 别名 = 共 26 个路由。响应统一为 `200 + {success, output, error}` 外壳。
+> **HTTP 路由实现总览**：14 个 POST + 1 个统一 GET 入口 `/metadata/{kind}` + 12 个 GET 别名 = 共 27 个路由。响应统一为 `200 + {success, output, error}` 外壳。
 
 ## HTTP API 端点
 
@@ -115,6 +115,63 @@
     "draft_url": "https://example.com/draft/downloader?id=xxx"
   }
 }
+```
+
+---
+
+#### POST /add_cover ✅
+
+为已保存的草稿添加封面图与封面文字。
+
+**重要说明:**
+- 必须先调用 `/save_draft` 保存草稿后再调用本接口
+- 封面注入直接修改磁盘上的 `draft_info.json` 文件
+- 基于剪映 6.x 国内版验证通过的 composition 引用链方案
+
+**请求参数:**
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| draft_id | string | 是 | 草稿 ID |
+| cover_url | string | 是 | 封面图片 URL (本地或远程) |
+| cover_text | string | 否 | 封面文字（可选） |
+| draft_folder | string | 否 | 草稿文件夹路径 |
+
+**响应示例:**
+
+```json
+{
+  "success": true,
+  "output": {
+    "draft_id": "draft_1234567890",
+    "draft_url": "https://example.com/draft/downloader?id=xxx"
+  }
+}
+```
+
+**使用示例:**
+
+```python
+# 1. 先创建并保存草稿
+draft = requests.post("http://localhost:9001/create_draft", json={
+    "width": 1080,
+    "height": 1920
+}).json()
+draft_id = draft["output"]["draft_id"]
+
+# 2. 添加视频等素材...
+
+# 3. 保存草稿
+requests.post("http://localhost:9001/save_draft", json={
+    "draft_id": draft_id
+})
+
+# 4. 添加封面（必须在保存后）
+requests.post("http://localhost:9001/add_cover", json={
+    "draft_id": draft_id,
+    "cover_url": "https://example.com/cover.jpg",
+    "cover_text": "我的视频封面"
+})
 ```
 
 ---
@@ -621,7 +678,7 @@ requests.post("http://localhost:9001/add_video_keyframe", json={
 
 ## MCP 工具清单 ✅
 
-VectCutAPI 提供 HTTP 与 MCP 双入口，共用 `features.*.service` 业务层。MCP 工具注册表位于 `vectcut/server/mcp/registry.py`，共 **12 个工具**，`inputSchema` 从对应 Pydantic 请求模型自动生成。
+VectCutAPI 提供 HTTP 与 MCP 双入口，共用 `features.*.service` 业务层。MCP 工具注册表位于 `vectcut/server/mcp/registry.py`，共 **13 个工具**，`inputSchema` 从对应 Pydantic 请求模型自动生成。
 
 | MCP 工具 | 对应 HTTP 路由 | 说明 |
 |----------|----------------|------|
@@ -634,6 +691,7 @@ VectCutAPI 提供 HTTP 与 MCP 双入口，共用 `features.*.service` 业务层
 | `add_effect` | `/add_effect` ✅ | 添加特效 |
 | `add_sticker` | `/add_sticker` ✅ | 添加贴纸 |
 | `add_video_keyframe` | `/add_video_keyframe` ✅ | 添加关键帧动画 |
+| `add_cover` | `/add_cover` ✅ | 为已保存的草稿添加封面图与封面文字 |
 | `get_video_duration` | `/get_duration` 🔲（HTTP 侧未实现） | 获取视频时长 |
 | `save_draft` | `/save_draft` ✅ | 保存草稿 |
 | `generate_draft_url` | `/generate_draft_url` ✅ | 生成草稿下载链接 |
@@ -653,6 +711,6 @@ VectCutAPI 提供 HTTP 与 MCP 双入口，共用 `features.*.service` 业务层
 
 | 状态 | 接口数 | 明细 |
 |------|--------|------|
-| ✅ 已实现（HTTP） | 13 POST + 1 统一 GET + 12 GET 别名 = 26 路由 | 草稿 5 + 素材 8 + 元数据 1+12 |
-| ✅ 已实现（MCP） | 12 工具 | 见上方 MCP 清单 |
+| ✅ 已实现（HTTP） | 14 POST + 1 统一 GET + 12 GET 别名 = 27 路由 | 草稿 6 + 素材 8 + 元数据 1+12 |
+| ✅ 已实现（MCP） | 13 工具 | 见上方 MCP 清单 |
 | 🔲 规划中（未实现） | 9 个 HTTP 接口 | `upload_video`、`upload_image`、`list_uploads`、`delete_upload`、`get_duration`、`export_to_capcut`、`export_draft_to_video`、`export_status`、`execute_workflow` |

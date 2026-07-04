@@ -53,6 +53,14 @@ def test_generate_draft_url_route():
     assert "dfd_1" in body["output"]["draft_url"]
 
 
+def test_add_cover_route_missing_params_returns_error_envelope():
+    resp = _client().post("/add_cover", json={})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is False
+    assert "draft_id" in body["error"]
+
+
 def test_get_video_duration_service_returns_envelope_dict():
     """MCP 用的 get_video_duration service：返回 {success,output,error} 结构（迁自 _save_engine）。"""
     from vectcut.features.draft import service

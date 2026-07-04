@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from vectcut.features.audio.schemas import AddAudioRequest
 from vectcut.features.audio.service import add_audio
 from vectcut.features.draft.schemas import (
+    AddCoverRequest,
     CreateDraftRequest,
     GenerateDraftUrlRequest,
     GenerateDraftUrlResponse,
@@ -20,6 +21,7 @@ from vectcut.features.draft.schemas import (
     SaveDraftRequest,
 )
 from vectcut.features.draft.service import (
+    add_cover,
     create_draft,
     generate_draft_url,
     get_video_duration,
@@ -58,6 +60,7 @@ TOOLS: Dict[str, ToolSpec] = {
     "add_effect": ToolSpec(add_effect, AddEffectRequest, "添加特效到草稿"),
     "add_sticker": ToolSpec(add_sticker, AddStickerRequest, "添加贴纸到草稿"),
     "add_video_keyframe": ToolSpec(add_video_keyframe, AddVideoKeyframeRequest, "添加视频关键帧，支持位置、缩放、旋转、透明度等属性动画"),
+    "add_cover": ToolSpec(add_cover, AddCoverRequest, "为已保存的草稿添加封面图与封面文字"),
     "get_video_duration": ToolSpec(get_video_duration, GetVideoDurationRequest, "获取视频时长"),
     "save_draft": ToolSpec(save_draft, SaveDraftRequest, "保存草稿"),
     "generate_draft_url": ToolSpec(

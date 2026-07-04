@@ -11,6 +11,7 @@ from vectcut.core.draft_store import DRAFT_CACHE, get_active_profile, get_or_cre
 from vectcut.core.errors import DraftNotFound
 from vectcut.features.draft._save_engine import save_draft_background, get_video_duration as _get_video_duration_impl
 from vectcut.features.draft.schemas import (
+    AddCoverRequest, AddCoverResponse,
     CreateDraftRequest, CreateDraftResponse,
     GetVideoDurationRequest, GetVideoDurationResponse,
     QueryDraftStatusRequest, QueryDraftStatusResponse,
@@ -65,4 +66,31 @@ def get_video_duration(req: GetVideoDurationRequest) -> GetVideoDurationResponse
         success=result["success"],
         output=result["output"],
         error=result["error"],
+    )
+
+
+def add_cover(req: AddCoverRequest) -> AddCoverResponse:
+    """为草稿添加封面图与封面文字。
+
+    委托 _cover_engine.add_cover_to_draft 执行实际注入逻辑。
+    注意：需要先 save_draft，再调用本接口，因为封面注入直接修改磁盘文件。
+    """
+    if req.draft_id not in DRAFT_CACHE:
+        raise DraftNotFound(req.draft_id)
+
+    from vectcut.features.draft._cover_engine import add_cover_to_draft
+
+    cfg = load_config()
+    folder = req.draft_folder if req.draft_folder is not None else cfg.draft_folder
+
+    add_cover_to_draft(
+        draft_id=req.draft_id,
+        cover_url=req.cover_url,
+        cover_text=req.cover_text,
+        draft_folder=folder,
+    )
+
+    return AddCoverResponse(
+        draft_id=req.draft_id,
+        draft_url=generate_draft_url(req.draft_id),
     )

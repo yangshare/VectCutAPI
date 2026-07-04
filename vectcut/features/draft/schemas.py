@@ -68,3 +68,15 @@ class GetVideoDurationResponse(BaseModel):
     success: bool = True
     output: Any = 0.0
     error: Optional[str] = None
+
+
+class AddCoverRequest(BaseModel):
+    draft_id: str
+    cover_url: str
+    cover_text: Optional[str] = None
+    draft_folder: Optional[str] = None
+
+
+class AddCoverResponse(BaseModel):
+    draft_id: str
+    draft_url: str

@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from vectcut.features.draft import service
 from vectcut.features.draft.schemas import (
+    AddCoverRequest,
     CreateDraftRequest,
     GenerateDraftUrlRequest,
     QueryDraftStatusRequest,
@@ -69,3 +70,13 @@ def generate_draft_url(body: dict):
         return envelope_err(f"Error occurred while generating draft url: {e}")
     url = service.generate_draft_url(req.draft_id)
     return envelope_ok({"draft_url": url})
+
+
+@router.post("/add_cover")
+def add_cover(body: dict):
+    try:
+        req = AddCoverRequest.model_validate(body)
+    except ValidationError as e:
+        return envelope_err(f"Hi, the required parameters are missing. {e}")
+    resp = service.add_cover(req)
+    return envelope_ok({"draft_id": resp.draft_id, "draft_url": resp.draft_url})

@@ -40,10 +40,13 @@ def test_tools_list_returns_all_tools_with_input_schema():
     tools = resp["result"]["tools"]
     names = {t["name"] for t in tools}
     assert "add_video" in names
+    assert "add_cover" in names
     # inputSchema 从模型生成
     add_video_tool = next(t for t in tools if t["name"] == "add_video")
     assert add_video_tool["inputSchema"]["type"] == "object"
     assert "video_url" in add_video_tool["inputSchema"]["properties"]
+    add_cover_tool = next(t for t in tools if t["name"] == "add_cover")
+    assert "cover_url" in add_cover_tool["inputSchema"]["properties"]
 
 
 def test_tools_call_create_draft():

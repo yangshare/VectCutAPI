@@ -26,9 +26,11 @@ if PROJECT_ROOT not in sys.path:
 
 from vectcut.features.video.service import add_video as add_video_track  # 任务6 迁 scripts/ 时重写
 from vectcut.features.audio.service import add_audio as add_audio_track  # 任务6 迁 scripts/ 时重写
+from vectcut.features.text.service import add_text as add_text_impl  # 片头封面文字
 from vectcut.features.draft.service import save_draft as save_draft_impl
 from vectcut.features.video.schemas import AddVideoRequest
 from vectcut.features.audio.schemas import AddAudioRequest
+from vectcut.features.text.schemas import AddTextRequest
 from vectcut.features.draft.schemas import SaveDraftRequest
 from vectcut.core.config import load_config
 
@@ -161,23 +163,139 @@ def main():
         draft_id = res.draft_id
         print(f"背景音乐添加完成, draft_id={draft_id}")
 
+    # 片头封面文字：用 add_text 在 0~5s 叠加「【测试草稿】」
+    print("\n== 添加片头封面文字 ==")
+    COVER_TEXT = "【测试草稿】"
+    try:
+        res = add_text_impl(AddTextRequest(
+            text=COVER_TEXT,
+            draft_id=draft_id,
+            start=0,
+            end=5,
+            track_name="cover_text",
+            font="LXGWWenKai_Bold",       # 霞鹜文楷，Font_type 内确定存在
+            font_size=12.0,               # 大标题
+            font_color="#FFFFFF",
+            transform_y=0.0,              # 居中
+            border_width=6.0,             # 描边，避免压在浅色画面上看不清
+            border_color="#000000",
+            shadow_enabled=True,
+            shadow_color="#000000",
+            shadow_distance=8.0,
+        ))
+        if getattr(res, "draft_id", None):
+            draft_id = res.draft_id
+            print(f"片头文字已添加: 「{COVER_TEXT}」 draft_id={draft_id}")
+        else:
+            print(f"片头文字添加失败: {res}")
+    except Exception as e:
+        print(f"片头文字添加异常: {e}")
+
     # 保存草稿（触发本地素材复制 + 元数据探测）
     print("\n== 保存草稿 ==")
     save_res = save_draft_impl(SaveDraftRequest(draft_id=draft_id, draft_folder=DRAFT_FOLDER))
     print(f"保存结果: success={save_res.success} draft_url={save_res.draft_url} error={save_res.error}")
 
-    # 放置封面：复制一张封面图到草稿目录下的 draft_cover.jpg
+    # 放置封面（路径 A：完整 composition 引用链）。
+    # 关键经验（剪映 6.x 国内版，对照手设封面后的真实 draft_content 取证）：
+    #   - 顶层 cover.cover_draft_id = "<GUID>_material"
+    #   - materials.drafts[0] = composition 子草稿，id 末尾带 "_material"
+    #     其 draft.id 不带后缀，draft.materials.videos[0].path 指向
+    #       ##_draftpath_placeholder_<GUID>_##/Resources/cover/<图片GUID>.jpg
+    #     draft.tracks[0].segments[0].material_id 指向该 videos[0].id
+    #   - 封面图真实文件落在 Resources\cover\<图片GUID>.jpg
+    #   - 根目录 draft_cover.jpg 是剪映自己生成的列表缩略预览，我们也放一份
+    #   - 路径 B（仅放文件名 + cover=null）经实测无效：剪映 6.x 不认文件名回退对外部放置的图
+    # 注入必须在 save_draft 之后：直接改磁盘 draft_info.json（pyJianYingDraft 的 Script.dumps
+    # 不会写 cover / materials.drafts，会在 save 时被覆盖，所以注入点在 save_draft完之后）。
     print("\n== 放置封面 ==")
     draft_dir = os.path.join(DRAFT_FOLDER, draft_id)
+    draft_info_path = os.path.join(draft_dir, "draft_info.json")
     cover_dst = os.path.join(draft_dir, "draft_cover.jpg")
-    covers = []
-    for ext in ("*.jpg", "*.jpeg", "*.png"):
-        covers += glob.glob(os.path.join(COVER_DIR, "**", ext), recursive=True)
-    if covers:
-        shutil.copyfile(covers[0], cover_dst)
-        print(f"封面已复制: {covers[0]} -> {cover_dst}")
+    # 优先用指定的高分辨率竖屏封面；找不到则回退到 COVER_DIR 下第一张图
+    PREFERRED_COVER = os.path.join(COVER_DIR, "生成二次元图片.png")  # 1536x2730 二次元竖屏
+    if os.path.isfile(PREFERRED_COVER):
+        cover_src = PREFERRED_COVER
     else:
+        covers = []
+        for ext in ("*.jpg", "*.jpeg", "*.png"):
+            covers += glob.glob(os.path.join(COVER_DIR, "**", ext), recursive=True)
+        cover_src = covers[0] if covers else None
+
+    # 生成 composition 注入模板（从 scripts/cover_composition_template.json 读取）
+    tpl_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cover_composition_template.json")
+    cover_ready = False
+    if cover_src and os.path.isfile(tpl_path):
+        import uuid
+        try:
+            tpl = json.load(open(tpl_path, encoding="utf-8"))
+            drafts_mat = tpl["drafts_material"]
+            top_cover = tpl["top_cover"]
+
+            # 为模板内所有 {{GUID_<i>}} 与 {{COVER_DRAFT_ID}} 统一重映射为新 GUID
+            # 注意 f-string 里 {{ }} 会折叠成单 { }，所以这里用显式拼接，避免 key 与模板不匹配
+            new_guids = {"{{GUID_%d}}" % i: str(uuid.uuid4()) for i in range(10)}
+            cover_id = new_guids["{{GUID_0}}"]   # composition 子草稿 id
+
+            def fill(o):
+                if isinstance(o, str):
+                    for k, v in new_guids.items():
+                        o = o.replace(k, v)
+                    o = o.replace("{{COVER_DRAFT_ID}}", cover_id)
+                    return o
+                if isinstance(o, dict):
+                    return {k: fill(v) for k, v in o.items()}
+                if isinstance(o, list):
+                    return [fill(v) for v in o]
+                return o
+
+            drafts_mat = fill(drafts_mat)
+            top_cover = fill(top_cover)
+
+            # 探测源图实际尺寸，写进 videos[0].width/height；并把源图（白底合成后）
+            # 复制到 Resources\cover\<图片GUID>.jpg（图片GUID = GUID_6 = new_guids[{{GUID_6}}]）
+            from PIL import Image
+            img = Image.open(cover_src).convert("RGBA")
+            bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
+            bg.alpha_composite(img)
+            rgb = bg.convert("RGB")
+            w, h = rgb.size
+            cover_img_guid = new_guids["{{GUID_6}}"]
+            cover_subdir = os.path.join(draft_dir, "Resources", "cover")
+            os.makedirs(cover_subdir, exist_ok=True)
+            cover_in_res = os.path.join(cover_subdir, cover_img_guid + ".jpg")
+            rgb.save(cover_in_res, "JPEG", quality=92)
+            # 根目录也放一份（剪映列表缩略预览）
+            rgb.thumbnail((405, 720))
+            rgb.save(cover_dst, "JPEG", quality=90)
+            cover_ready = True
+            print(f"封面图已落盘: {cover_in_res}（{w}x{h}）+ 根 draft_cover.jpg 预览")
+
+            # 改写 videos[0].width/height 为源图实际尺寸
+            v0 = drafts_mat["draft"]["materials"]["videos"][0]
+            v0["width"] = w
+            v0["height"] = h
+            # path 已被 fill 自动替换为最终值
+
+            # 注入 draft_info.json：顶层 cover + 追加 materials.drafts
+            with open(draft_info_path, "r", encoding="utf-8") as f:
+                info = json.load(f)
+            info["cover"] = top_cover
+            md = info.setdefault("materials", {}).setdefault("drafts", [])
+            # 去重：若已有同 id 的 composition 条目则替换
+            md = [m for m in md if m.get("id") != drafts_mat["id"]]
+            md.append(drafts_mat)
+            info["materials"]["drafts"] = md
+            with open(draft_info_path, "w", encoding="utf-8") as f:
+                json.dump(info, f, ensure_ascii=False, indent=4)
+            print(f"已注入 cover + materials.drafts[composition] 到 draft_info.json（cover_draft_id={cover_id}_material）")
+        except Exception as e:
+            print(f"封面 composition 注入失败: {e}")
+            import traceback; traceback.print_exc()
+    elif not cover_src:
         print("未找到封面素材。")
+    else:
+        print(f"封面模板缺失: {tpl_path}")
 
     # 校验草稿目录结构
     print("\n== 草稿目录结构 ==")

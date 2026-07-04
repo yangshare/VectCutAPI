@@ -1,4 +1,4 @@
-"""MCP tool 注册表测试：12 个 tool 全部注册、name 唯一、schema 可生成。"""
+"""MCP tool 注册表测试：全部 tool 注册、name 唯一、schema 可生成。"""
 from vectcut.server.mcp.registry import TOOLS
 from vectcut.server.mcp.schema_gen import pydantic_to_input_schema
 
@@ -6,11 +6,11 @@ from vectcut.server.mcp.schema_gen import pydantic_to_input_schema
 EXPECTED_NAMES = {
     "create_draft", "add_video", "add_audio", "add_image", "add_text",
     "add_subtitle", "add_effect", "add_sticker", "add_video_keyframe",
-    "get_video_duration", "save_draft", "generate_draft_url",
+    "get_video_duration", "save_draft", "generate_draft_url", "add_cover",
 }
 
 
-def test_all_12_tools_registered():
+def test_all_tools_registered():
     assert set(TOOLS.keys()) == EXPECTED_NAMES
 
 
