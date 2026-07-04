@@ -124,7 +124,10 @@ def add_video_keyframe(req: AddVideoKeyframeRequest) -> AddVideoKeyframeResponse
         raise DraftNotFound(req.draft_id)
 
     try:
-        track = script.get_imported_track(draft.Track_type.video, name=req.track_name)
+        # 保真：原始 add_video_keyframe_impl.py:55 用 get_track(Video_segment, ...)。
+        # add_video 通过 add_track 创建普通轨道(存于 script.tracks), 必须用 get_track
+        # 才能命中; get_imported_track 只查 script.imported_tracks, 会误报 "not found"。
+        track = script.get_track(draft.Video_segment, track_name=req.track_name)
     except Exception:
         raise InvalidParam(f"Track named {req.track_name} not found")
 
