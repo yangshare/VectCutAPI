@@ -10,10 +10,13 @@ _wire_exception_handlers 保留在此处，供 feature router 测试 import。
 """
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from vectcut import __version__
 from vectcut.core.errors import VectCutError
 from vectcut.server._helpers import envelope_err, envelope_ok  # noqa: F401
 
@@ -44,3 +47,17 @@ def _wire_exception_handlers(app: FastAPI) -> FastAPI:
 
 
 app = _wire_exception_handlers(FastAPI(title="VectCutAPI"))
+
+
+@app.get("/api/health")
+async def health_check():
+    """健康检查端点（供 Docker HEALTHCHECK 与 Nginx 探活）。
+
+    返回 200 + {status, timestamp, version}。
+    不走统一信封，方便 Docker/Nginx 直接判断状态码。
+    """
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "version": __version__,
+    }
