@@ -37,3 +37,33 @@ def test_media_download_error_carries_code_and_502():
     err = MediaDownloadError("404 from cdn")
     assert err.code == "MEDIA_DOWNLOAD_ERROR"
     assert err.http_status == 502
+
+
+def test_template_error_is_vectcut_subclass_with_400():
+    from vectcut.core.errors import TemplateError, VectCutError
+
+    err = TemplateError("zip invalid")
+    assert isinstance(err, VectCutError)
+    assert err.code == "TEMPLATE_ERROR"
+    assert err.http_status == 400
+    assert "zip invalid" in str(err)
+
+
+def test_slot_error_is_vectcut_subclass_with_400():
+    from vectcut.core.errors import SlotError, VectCutError
+
+    err = SlotError("slot track not found")
+    assert isinstance(err, VectCutError)
+    assert err.code == "SLOT_ERROR"
+    assert err.http_status == 400
+    assert "slot track not found" in str(err)
+
+
+def test_render_error_is_vectcut_subclass_with_400():
+    from vectcut.core.errors import RenderError, VectCutError
+
+    err = RenderError("duration mismatch")
+    assert isinstance(err, VectCutError)
+    assert err.code == "RENDER_ERROR"
+    assert err.http_status == 400
+    assert "duration mismatch" in str(err)

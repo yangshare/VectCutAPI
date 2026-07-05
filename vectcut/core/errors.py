@@ -41,3 +41,24 @@ class MediaDownloadError(VectCutError):
 
     code = "MEDIA_DOWNLOAD_ERROR"
     http_status = 502
+
+
+class TemplateError(VectCutError):
+    """模板相关错误（模板不存在、ZIP 格式无效等）。HTTP 400。"""
+
+    code = "TEMPLATE_ERROR"
+    http_status = 400
+
+
+class SlotError(VectCutError):
+    """槽位相关错误（槽位配置无效、轨道/片段不存在等）。HTTP 400。"""
+
+    code = "SLOT_ERROR"
+    http_status = 400
+
+
+class RenderError(VectCutError):
+    """生成相关错误（元数据无效、时长对齐失败等）。HTTP 400。"""
+
+    code = "RENDER_ERROR"
+    http_status = 400
