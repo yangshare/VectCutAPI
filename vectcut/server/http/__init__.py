@@ -12,6 +12,7 @@ from vectcut.features.text.router import router as text_router
 from vectcut.features.image.router import router as image_router
 from vectcut.features.effect.router import router as effect_router
 from vectcut.features.metadata.router import router as metadata_router
+from vectcut.features.template_filling.router import router as template_router
 
 app.include_router(draft_router)
 app.include_router(video_router)
@@ -20,3 +21,4 @@ app.include_router(text_router)
 app.include_router(image_router)
 app.include_router(effect_router)
 app.include_router(metadata_router)
+app.include_router(template_router)
