@@ -14,7 +14,7 @@ from typing import Any, Dict, List
 import pyJianYingDraft as draft
 
 from vectcut.core.config import load_config
-from vectcut.core.errors import RenderError, SlotError, TemplateError
+from vectcut.core.errors import RenderError, SlotError, TemplateError, make_error
 from vectcut.features.template_filling import (
     duration_calculator,
     material_builder,
@@ -209,7 +209,7 @@ def download_draft(draft_id: str) -> DownloadDraftResponse:
 
     zip_path = storage.get_generated_draft_zip_path(draft_id)
     if zip_path is None:
-        raise RenderError(f"草稿 {draft_id} 不存在")
+        raise make_error("R_TASK_NOT_FOUND", details={"draft_id": draft_id})
 
     return DownloadDraftResponse(
         draft_id=draft_id,

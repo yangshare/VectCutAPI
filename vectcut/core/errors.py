@@ -14,6 +14,10 @@ class VectCutError(Exception):
     code: str = "VECTCUT_ERROR"
     http_status: int = 500
 
+    def __init__(self, message: str = "", details: dict | None = None):
+        super().__init__(message)
+        self.details = details or {}
+
 
 class InvalidParam(VectCutError):
     """参数非法（未知 kind、end<=start 等）。HTTP 422 / JSON-RPC -32002。"""
@@ -62,3 +66,50 @@ class RenderError(VectCutError):
 
     code = "RENDER_ERROR"
     http_status = 400
+
+
+ERROR_CODES = {
+    "T_NOT_FOUND": "模板不存在",
+    "T_INVALID_ZIP": "ZIP 文件格式无效",
+    "T_TOO_LARGE": "模板文件过大",
+    "T_NO_DRAFT_CONTENT": "ZIP 中缺少 draft_content.json",
+    "T_INVALID_ID": "模板 ID 非法",
+    "S_NOT_FOUND": "槽位配置不存在",
+    "S_TRACK_NOT_FOUND": "母版中找不到指定轨道",
+    "S_SEGMENT_NOT_FOUND": "母版中找不到指定片段",
+    "S_TYPE_MISMATCH": "槽位类型与轨道类型不匹配",
+    "S_INVALID_SLOT": "槽位 ID 在母版中不存在",
+    "R_MISSING_SLOT": "必填槽位未提供",
+    "R_INVALID_PATH": "素材路径格式无效",
+    "R_INVALID_DURATION": "素材时长异常",
+    "R_LOOP_TOO_MANY": "视频时长不足，需循环次数过多",
+    "R_SRT_PARSE_ERROR": "SRT 文件格式错误",
+    "R_GENERATE_FAILED": "草稿生成失败",
+    "R_EMPTY_VIDEO": "视频槽位为空",
+    "R_ZERO_DURATION": "素材总时长为 0",
+    "R_TASK_NOT_FOUND": "草稿任务不存在或已过期",
+    "R_INVALID_TASK": "task_id 非法",
+    "INTERNAL_ERROR": "服务器内部错误",
+}
+
+
+def make_error(
+    code: str,
+    message: str | None = None,
+    details: dict | None = None,
+) -> "VectCutError":
+    """工厂函数：按错误码构造 VectCutError 子类实例。
+
+    根据代码前缀（T_/S_/R_）选择对应子类，方便上层 catch。
+    """
+    msg = message or ERROR_CODES.get(code, code)
+    if code.startswith("T_"):
+        err = TemplateError(msg, details=details)
+    elif code.startswith("S_"):
+        err = SlotError(msg, details=details)
+    elif code.startswith("R_"):
+        err = RenderError(msg, details=details)
+    else:
+        err = VectCutError(msg, details=details)
+    err.code = code
+    return err

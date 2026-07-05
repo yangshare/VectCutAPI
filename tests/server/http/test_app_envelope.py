@@ -48,8 +48,10 @@ def test_invalid_param_handler_returns_200_envelope():
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is False
-    assert body["output"] == ""
-    assert "bad param" in body["error"]
+    assert body["output"] is None
+    assert body["error"]["code"] == "INVALID_PARAM"
+    assert "bad param" in body["error"]["message"]
+    assert body["error"]["details"] == {}
 
 
 def test_draft_not_found_handler_returns_200_envelope():
@@ -57,7 +59,8 @@ def test_draft_not_found_handler_returns_200_envelope():
     resp = client.post("/raise_not_found")
     assert resp.status_code == 200
     assert resp.json()["success"] is False
-    assert "dfd_x" in resp.json()["error"]
+    assert resp.json()["error"]["code"] == "DRAFT_NOT_FOUND"
+    assert "dfd_x" in resp.json()["error"]["message"]
 
 
 def test_unexpected_exception_handler_returns_200_envelope():

@@ -96,4 +96,4 @@ def download_draft(draft_id: str):
             filename=f"{draft_id}.zip",
         )
     except VectCutError as e:
-        return envelope_err(str(e))
+        return envelope_err(e)

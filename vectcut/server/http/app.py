@@ -30,7 +30,7 @@ def _wire_exception_handlers(app: FastAPI) -> FastAPI:
 
     @app.exception_handler(VectCutError)
     async def _vectcut_error_handler(_req: Request, exc: VectCutError):
-        return JSONResponse(status_code=200, content=envelope_err(str(exc)))
+        return JSONResponse(status_code=200, content=envelope_err(exc))
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error_handler(_req: Request, exc: RequestValidationError):

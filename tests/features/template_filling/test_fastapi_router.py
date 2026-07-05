@@ -172,7 +172,8 @@ def test_download_endpoint_not_found(monkeypatch):
     assert resp.status_code == 200
     data = resp.json()
     assert data["success"] is False
-    assert "不存在" in data["error"]
+    assert data["error"]["code"] == "RENDER_ERROR"
+    assert "不存在" in data["error"]["message"]
 
 
 def test_download_endpoint_success(monkeypatch, tmp_path):
