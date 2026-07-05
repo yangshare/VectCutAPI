@@ -1,0 +1,76 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    image: vectcut-api:latest
+    container_name: vectcut-api
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - TZ=Asia/Shanghai
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - type: bind
+        source: ./config.json
+        target: /app/config.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - template_data:/app/data/templates
+      - template_config_data:/app/data/template_configs
+      - generated_data:/app/data/generated
+      - temp_data:/app/data/temp
+      - logs_data:/app/logs
+    networks:
+      - vectcut_net
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  nginx:
+    image: nginx:alpine
+    container_name: vectcut-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - type: bind
+        source: ./docker/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./docker/ssl
+        target: /etc/nginx/ssl
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - vectcut_net
+
+networks:
+  vectcut_net:
+    driver: bridge
+
+volumes:
+  template_data:
+    name: vectcutapi_template_data
+  template_config_data:
+    name: vectcutapi_template_config_data
+  generated_data:
+    name: vectcutapi_generated_data
+  temp_data:
+    name: vectcutapi_temp_data
+  logs_data:
+    name: vectcutapi_logs_data

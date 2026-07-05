@@ -1,0 +1,14 @@
+# 本地开发覆盖：默认仅启动 api，并只在本机暴露端口，无需 SSL。
+# 生产部署应使用 base compose（后续部署文档会固化）；若合并本文件，api 端口仍限制在 loopback。
+
+services:
+  api:
+    ports:
+      - target: 9001
+        published: "9001"
+        host_ip: 127.0.0.1
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  nginx:
+    profiles: ["production"]  # 开发时不启动 nginx
