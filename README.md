@@ -53,6 +53,27 @@
 | **关键帧** | ✅ | ✅ | 属性动画、时间轴控制、缓动函数 |
 | **媒体分析** | ✅ | ✅ | 视频时长获取、格式检测 |
 
+### 模板填充（template_filling）
+
+云端母版 + 客户端本地素材的混合模式：
+
+- 上传剪映母版 ZIP，自动识别槽位（video/audio/bgm/subtitle）
+- 客户端提供本地素材元数据（path/duration/width/height），云端不接触文件
+- 渲染导出新草稿 ZIP，客户端下载后用剪映打开
+
+**API 端点：**
+
+- `POST /api/template/import?template_id=xxx`（multipart file）— 导入母版 ZIP，返回自动扫描的槽位列表
+- `POST /api/template/slot-config` — 保存槽位配置（template_id + slots 列表）
+- `POST /api/template/render` — 渲染草稿（template_id + slot_values），返回 draft_id 与 download_url
+- `GET /api/template/download/{draft_id}` — 下载草稿 ZIP
+
+**MVP 范围：**
+
+- ✅ 视频/音频/BGM 素材替换（绕过 ffprobe，用元数据直接构造 material）
+- ⚠️ 字幕/封面替换为占位 warning（后续实现）
+- ⚠️ 时长对齐仅计算 warnings（后续实现）
+
 ## API 文档
 
 完整的接口清单、请求参数与实现状态请查看：
