@@ -1,0 +1,10 @@
+ssl/
+*.pem
+*.key
+*.crt
+*.cer
+*.csr
+*.p12
+*.pfx
+.htpasswd
+htpasswd

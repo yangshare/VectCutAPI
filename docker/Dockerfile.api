@@ -1,0 +1,56 @@
+FROM python:3.10-slim
+
+# Install system dependencies. curl is used by HEALTHCHECK.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install dependency files first where possible for Docker layer caching.
+COPY requirements.txt requirements-mcp.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements-mcp.txt
+
+# Copy package metadata and source, then install project dependencies from pyproject.toml.
+COPY pyproject.toml README.md ./
+COPY vectcut/ ./vectcut/
+RUN pip install --no-cache-dir .
+
+# Copy runtime resources used by the HTTP and draft engines.
+COPY pyJianYingDraft/ ./pyJianYingDraft/
+COPY settings/ ./settings/
+COPY draft_profiles.py ./
+COPY template/ ./template/
+COPY template_jianying/ ./template_jianying/
+COPY template_jianying_10_2/ ./template_jianying_10_2/
+RUN mkdir -p /app/scripts
+COPY scripts/cover_composition_template.json ./scripts/cover_composition_template.json
+
+# Copy entrypoints and default config.
+COPY run_http.py run_mcp.py ./
+COPY config.json.example ./config.json.example
+COPY config.json.example ./config.json
+
+# Create data directories. Runtime volumes may override these paths.
+RUN mkdir -p \
+    /app/data/templates \
+    /app/data/template_configs \
+    /app/data/generated \
+    /app/data/generated_drafts \
+    /app/data/temp \
+    /app/logs \
+    && useradd -r -u 10001 -g root vectcut \
+    && chown -R vectcut:root /app/data /app/logs
+
+EXPOSE 9001
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -fsS http://localhost:9001/api/health || exit 1
+
+ENV TZ=Asia/Shanghai
+ENV PYTHONUNBUFFERED=1
+
+USER vectcut
+
+CMD ["python", "run_http.py"]
