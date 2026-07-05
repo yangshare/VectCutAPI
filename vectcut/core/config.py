@@ -48,6 +48,10 @@ class Settings(BaseModel):
     preview_router: str = "/draft/downloader"
     is_upload_draft: bool = False
     draft_folder: str = ""
+    # template_filling feature 存储目录（相对路径，由 storage.py 在使用时 mkdir）
+    template_folder: str = "./data/templates"
+    template_config_folder: str = "./data/template_configs"
+    generated_draft_folder: str = "./data/generated_drafts"
     oss_config: OssConfig = Field(default_factory=OssConfig)
     mp4_oss_config: Mp4OssConfig = Field(default_factory=Mp4OssConfig)
 
