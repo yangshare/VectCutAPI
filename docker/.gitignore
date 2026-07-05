@@ -1,4 +1,5 @@
-ssl/
+ssl/*
+!ssl/.htpasswd.example
 *.pem
 *.key
 *.crt
