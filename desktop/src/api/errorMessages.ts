@@ -47,3 +47,48 @@ export function getUserFriendlyError(error: ApiError): string {
   }
   return base;
 }
+
+function isApiError(error: unknown): error is ApiError {
+  return Boolean(
+    error
+      && typeof error === 'object'
+      && 'code' in error
+      && typeof (error as { code: unknown }).code === 'string'
+      && 'message' in error
+      && typeof (error as { message: unknown }).message === 'string',
+  );
+}
+
+function hasMessage(error: unknown): error is { message: string } {
+  return Boolean(
+    error
+      && typeof error === 'object'
+      && 'message' in error
+      && typeof (error as { message: unknown }).message === 'string',
+  );
+}
+
+export function formatUserFacingError(error: unknown): string {
+  if (isApiError(error)) {
+    return getUserFriendlyError(error);
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (hasMessage(error)) {
+    return error.message;
+  }
+
+  if (error && typeof error === 'object') {
+    try {
+      const serialized = JSON.stringify(error);
+      return serialized || '操作失败，请重试';
+    } catch {
+      return '操作失败，请重试';
+    }
+  }
+
+  return String(error);
+}

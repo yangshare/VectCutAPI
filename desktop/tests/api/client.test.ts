@@ -458,6 +458,39 @@ describe('error message mapping', () => {
     expect(getUserFriendlyError({ code: 'RESPONSE_FORMAT_ERROR', message: 'bad json' }))
       .toBe('服务器响应格式异常，请稍后重试');
   });
+
+  it('formats ApiError values through the user-friendly mapping', async () => {
+    const { formatUserFacingError } = await import('../../src/api/errorMessages');
+
+    expect(formatUserFacingError({ code: 'T_INVALID_ZIP', message: 'invalid zip' }))
+      .toBe('母版 ZIP 文件格式无效，请检查是否为完整的剪映草稿文件夹');
+  });
+
+  it('formats Error instances with their message', async () => {
+    const { formatUserFacingError } = await import('../../src/api/errorMessages');
+
+    expect(formatUserFacingError(new Error('本地读取失败'))).toBe('本地读取失败');
+  });
+
+  it('formats plain objects with message fields without object placeholders', async () => {
+    const { formatUserFacingError } = await import('../../src/api/errorMessages');
+
+    expect(formatUserFacingError({ message: '服务暂不可用' })).toBe('服务暂不可用');
+  });
+
+  it('formats plain objects without message fields as JSON', async () => {
+    const { formatUserFacingError } = await import('../../src/api/errorMessages');
+
+    expect(formatUserFacingError({ reason: 'bad input', slot: 2 })).toBe('{"reason":"bad input","slot":2}');
+  });
+
+  it('uses a fixed fallback when object stringification fails', async () => {
+    const { formatUserFacingError } = await import('../../src/api/errorMessages');
+    const circular: { self?: unknown } = {};
+    circular.self = circular;
+
+    expect(formatUserFacingError(circular)).toBe('操作失败，请重试');
+  });
 });
 
 describe('api client result types', () => {
