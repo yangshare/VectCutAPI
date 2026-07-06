@@ -23,7 +23,7 @@ python run_http.py
 验证：
 
 ```bash
-curl http://localhost:9001/api/health
+curl http://localhost:9001/health
 ```
 
 预期返回 `{"status":"healthy", ...}`。
@@ -38,7 +38,7 @@ cp .env.example .env
 # 按需编辑 config.json 和 .env
 
 docker compose up -d --build
-curl http://localhost:9001/api/health
+curl http://localhost:9001/health
 ```
 
 停止开发环境：
@@ -77,20 +77,14 @@ mkdir -p docker/ssl
 # docker/ssl/privkey.pem
 ```
 
-### 2. 可选 Basic Auth
+### 2. 准备 Basic Auth
 
-默认 Basic Auth 未启用。生产如需启用，先生成 `.htpasswd`：
+生产 Nginx 的 `/api/` 默认启用 Basic Auth。启动生产栈前必须生成
+`docker/ssl/.htpasswd`：
 
 ```bash
 # Ubuntu/Debian: apt-get install -y apache2-utils
 htpasswd -c docker/ssl/.htpasswd admin
-```
-
-然后取消 `docker/nginx.conf` 中这两行注释：
-
-```nginx
-# auth_basic "VectCut API";
-# auth_basic_user_file /etc/nginx/ssl/.htpasswd;
 ```
 
 `.htpasswd`、证书和私钥已被 `docker/.gitignore` 忽略，不要提交到仓库。
@@ -101,14 +95,15 @@ htpasswd -c docker/ssl/.htpasswd admin
 docker compose -f docker-compose.yml --profile production up -d --build
 docker compose -f docker-compose.yml --profile production ps
 
-curl -k https://localhost/api/health
-curl -I http://localhost/api/health
+curl -k https://localhost/health
+curl -I http://localhost/health
 ```
 
-如果已启用 Basic Auth，HTTPS 健康检查需要带认证：
+`/health` 保持未认证，供 Docker 和反代健康检查使用。访问其它 `/api/`
+接口需要带 Basic Auth：
 
 ```bash
-curl -k -u admin:<password> https://localhost/api/health
+curl -k -u admin:<password> https://localhost/api/template/...
 ```
 
 预期：
@@ -133,7 +128,8 @@ curl -k -u admin:<password> https://localhost/api/health
 ./scripts/deploy.sh --dev --down
 ```
 
-脚本会先执行 `git pull --ff-only`，生产健康检查优先访问 `https://localhost/api/health`。
+脚本会在生产启动前检查 `docker/ssl/.htpasswd` 是否存在，然后执行
+`git pull --ff-only`。生产健康检查优先访问 `https://localhost/health`。
 
 ## 四、数据持久化与备份
 
@@ -196,6 +192,7 @@ docker compose -f docker-compose.yml --profile production logs --tail=100 nginx
 - `docker/nginx.conf`
 - `docker/ssl/fullchain.pem`
 - `docker/ssl/privkey.pem`
+- `docker/ssl/.htpasswd`
 
 ### Nginx 502
 
@@ -230,12 +227,12 @@ docker volume inspect vectcutapi_generated_data
 
 ## 七、验收清单
 
-- `GET /api/health` 返回 healthy。
+- `GET /health` 返回 healthy。
 - 错误响应包含标准错误码和统一信封。
 - 日志不会输出原始素材路径、SRT 内容、token 或敏感字段。
 - `config.json` 支持 `${VAR}` 环境变量注入。
 - Dockerfile 可构建 API 镜像。
 - Compose 可解析，并持久化关键数据卷。
 - Nginx 支持 HTTPS、HTTP 跳转、限流和 `/api` 前缀保留转发。
-- 可选 Basic Auth 可按需启用。
+- `/api/` 默认受 Basic Auth 保护，`/health` 保持未认证。
 - 备份脚本可生成三个业务数据卷归档。

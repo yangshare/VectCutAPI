@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from vectcut.core.errors import RenderError
 from vectcut.features.template_filling.material_builder import (
     build_audio_material_from_metadata,
     build_image_material_from_metadata,
@@ -44,6 +45,32 @@ class TestBuildVideoMaterial:
         assert mat.path == "X:/nonexistent/video.mp4"
         assert mat.remote_url is None
 
+    @pytest.mark.parametrize(
+        ("metadata", "expected_code"),
+        [
+            ({"duration": 10.0, "width": 1280, "height": 720}, "R_INVALID_PATH"),
+            ({"path": "", "duration": 10.0, "width": 1280, "height": 720}, "R_INVALID_PATH"),
+            ({"path": "C:/videos/sample.mp4", "width": 1280, "height": 720}, "R_INVALID_DURATION"),
+            ({"path": "C:/videos/sample.mp4", "duration": 0, "width": 1280, "height": 720}, "R_INVALID_DURATION"),
+            ({"path": "C:/videos/sample.mp4", "duration": "bad", "width": 1280, "height": 720}, "R_INVALID_DURATION"),
+            ({"path": "C:/videos/sample.mp4", "duration": 10.0, "height": 720}, "R_INVALID_PATH"),
+            ({"path": "C:/videos/sample.mp4", "duration": 10.0, "width": 1280}, "R_INVALID_PATH"),
+            ({"path": "C:/videos/sample.mp4", "duration": 10.0, "width": 0, "height": 720}, "R_INVALID_PATH"),
+        ],
+    )
+    def test_invalid_video_metadata_raises_structured_render_error(
+        self, metadata, expected_code
+    ):
+        with pytest.raises(RenderError) as exc:
+            build_video_material_from_metadata(metadata)
+        assert exc.value.code == expected_code
+
+    def test_non_dict_video_metadata_raises_structured_render_error(self):
+        with pytest.raises(RenderError) as exc:
+            build_video_material_from_metadata("not-a-dict")
+        assert exc.value.code == "R_INVALID_PATH"
+        assert exc.value.details["metadata_type"] == "str"
+
 
 class TestBuildAudioMaterial:
     def test_constructs_audio_material_with_correct_fields(self):
@@ -61,6 +88,29 @@ class TestBuildAudioMaterial:
         )
         assert mat.path == "X:/nonexistent/audio.mp3"
         assert mat.remote_url is None
+
+    @pytest.mark.parametrize(
+        ("metadata", "expected_code"),
+        [
+            ({"duration": 45.0}, "R_INVALID_PATH"),
+            ({"path": ""}, "R_INVALID_PATH"),
+            ({"path": "C:/audio/bgm.mp3"}, "R_INVALID_DURATION"),
+            ({"path": "C:/audio/bgm.mp3", "duration": 0}, "R_INVALID_DURATION"),
+            ({"path": "C:/audio/bgm.mp3", "duration": "bad"}, "R_INVALID_DURATION"),
+        ],
+    )
+    def test_invalid_audio_metadata_raises_structured_render_error(
+        self, metadata, expected_code
+    ):
+        with pytest.raises(RenderError) as exc:
+            build_audio_material_from_metadata(metadata)
+        assert exc.value.code == expected_code
+
+    def test_non_dict_audio_metadata_raises_structured_render_error(self):
+        with pytest.raises(RenderError) as exc:
+            build_audio_material_from_metadata("not-a-dict")
+        assert exc.value.code == "R_INVALID_PATH"
+        assert exc.value.details["metadata_type"] == "str"
 
 
 class TestBuildImageMaterial:
@@ -82,3 +132,9 @@ class TestBuildImageMaterial:
         assert mat.path == "X:/nonexistent/image.png"
         assert mat.material_type == "photo"
         assert mat.remote_url is None
+
+    def test_non_dict_image_metadata_raises_structured_render_error(self):
+        with pytest.raises(RenderError) as exc:
+            build_image_material_from_metadata("not-a-dict")
+        assert exc.value.code == "R_INVALID_PATH"
+        assert exc.value.details["metadata_type"] == "str"

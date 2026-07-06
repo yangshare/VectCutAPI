@@ -27,7 +27,7 @@ services:
     networks:
       - vectcut_net
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:9001/api/health"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:9001/health"]
       interval: 30s
       timeout: 10s
       retries: 3

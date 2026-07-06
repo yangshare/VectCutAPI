@@ -134,6 +134,7 @@ def temp_storage_dirs(monkeypatch, tmp_path: Path) -> Dict[str, Path]:
         template_folder=str(templates),
         template_config_folder=str(configs),
         generated_draft_folder=str(generated),
+        max_template_zip_mb=50,
         # 其它字段（防止意外访问）
         draft_folder=str(tmp_path / "drafts"),
     )

@@ -16,9 +16,12 @@ _DEFAULT_LOG_FILE_EXISTED_BEFORE_IMPORT = _DEFAULT_LOG_FILE.exists()
 from vectcut.core.logger import (
     default_logger,
     sanitize_dict,
+    sanitize_exception,
     sanitize_path,
     sanitize_srt,
+    sanitize_text,
     sanitize_token,
+    sanitize_url,
     setup_logger,
 )
 
@@ -61,11 +64,195 @@ def test_sanitize_srt_records_size_only():
     assert "你好世界" not in result
 
 
-def test_sanitize_token_keeps_first_8_chars():
+def test_sanitize_token_masks_values_completely():
     token = "abcdef1234567890xyz"
     result = sanitize_token(token)
-    assert result == "abcdef12..."
-    assert "xyz" not in result
+    assert result == "***"
+    assert "abcdef12" not in result
+    assert token not in result
+
+
+def test_sanitize_token_masks_short_values_completely():
+    assert sanitize_token("abc") == "***"
+
+
+def test_sanitize_url_masks_short_sensitive_query_values():
+    result = sanitize_url("https://example.com/a?token=abc")
+    assert "token=abc" not in result
+    assert "abc" not in result
+    assert "example.com/a" in result
+
+
+def test_sanitize_text_masks_short_free_text_secrets():
+    result = sanitize_text("token=abc")
+    assert "token=abc" not in result
+    assert "abc" not in result
+
+
+def test_sanitize_text_preserves_http_api_paths():
+    result = sanitize_text("POST /api/template/import failed")
+    assert "/api/template/import" in result
+
+
+def test_sanitize_text_masks_posix_media_paths():
+    result = sanitize_text("failed writing /home/alice/secret/video.mp4")
+    assert "/home/alice/secret/video.mp4" not in result
+    assert "/home/alice/secret" not in result
+    assert "video.mp4" in result
+
+
+def test_sanitize_text_masks_unicode_posix_paths():
+    result = sanitize_text("failed /tmp/素材/video.mp4")
+    assert "/tmp/素材/video.mp4" not in result
+    assert "/tmp/素材" not in result
+    assert "video.mp4" in result
+
+
+def test_sanitize_text_masks_top_level_posix_paths():
+    result = sanitize_text("failed opening /tmp/secret.txt")
+    assert "/tmp/secret.txt" not in result
+    assert "secret.txt" in result
+
+
+def test_sanitize_text_masks_quoted_windows_paths_with_spaces():
+    raw_path = r"C:\Users\Alice\My Videos\secret.mp4"
+    result = sanitize_text(f'failed writing "{raw_path}"')
+    assert raw_path not in result
+    assert "My Videos" not in result
+    assert "secret.mp4" in result
+
+
+def test_sanitize_text_masks_quoted_posix_paths_with_spaces():
+    raw_path = "/home/alice/My Videos/secret.mp4"
+    result = sanitize_text(f"failed writing '{raw_path}'")
+    assert raw_path not in result
+    assert "My Videos" not in result
+    assert "secret.mp4" in result
+
+
+def test_sanitize_text_masks_unquoted_windows_paths_with_spaces():
+    raw_path = r"C:\Users\Alice\My Videos\secret clip.mp4"
+    result = sanitize_text(f"failed writing {raw_path}")
+    assert raw_path not in result
+    assert r"C:\Users\Alice" not in result
+    assert "My Videos" not in result
+    assert "secret clip.mp4" in result
+
+
+def test_sanitize_text_masks_unquoted_windows_paths_with_spaces_without_extension():
+    raw_path = r"C:\Users\Alice\My Videos\draft123"
+    result = sanitize_text(f"failed writing {raw_path}")
+    assert raw_path not in result
+    assert r"C:\Users\Alice" not in result
+    assert "My Videos" not in result
+    assert "draft123" in result
+
+
+def test_sanitize_text_masks_unquoted_posix_paths_with_spaces():
+    raw_path = "/home/alice/My Videos/secret clip.mp4"
+    result = sanitize_text(f"failed writing {raw_path}")
+    assert raw_path not in result
+    assert "/home/alice" not in result
+    assert "My Videos" not in result
+    assert "secret clip.mp4" in result
+
+
+def test_sanitize_text_masks_unquoted_posix_paths_with_spaces_without_extension():
+    raw_path = "/home/alice/My Videos/draft123"
+    result = sanitize_text(f"failed writing {raw_path}")
+    assert raw_path not in result
+    assert "/home/alice" not in result
+    assert "My Videos" not in result
+    assert "draft123" in result
+
+
+def test_sanitize_text_masks_free_text_secrets():
+    result = sanitize_text(
+        "token=SECRET_TOKEN_123456 access_token SECRET_TOKEN_123456"
+    )
+    assert "SECRET_TOKEN_123456" not in result
+    assert "SECRET_T" not in result
+    assert "token=***" in result
+    assert "access_token ***" in result
+
+
+def test_sanitize_text_masks_free_text_credentials():
+    result = sanitize_text(
+        "credential=secret123 credential: secret456 credential secret789 token=tok123"
+    )
+    assert "secret123" not in result
+    assert "secret456" not in result
+    assert "secret789" not in result
+    assert "tok123" not in result
+    assert "credential=***" in result
+    assert "credential: ***" in result
+    assert "credential ***" in result
+    assert "token=***" in result
+
+
+def test_sanitize_text_masks_authorization_bearer_token():
+    result = sanitize_text("Authorization: Bearer SECRET_TOKEN_123456")
+    assert "SECRET_TOKEN_123456" not in result
+    assert "SECRET_T" not in result
+    assert "Authorization: Bearer ***" in result
+
+
+def test_sanitize_text_masks_authorization_basic_credential():
+    result = sanitize_text("Request failed with Authorization: Basic dXNlcjpwYXNz")
+    assert "dXNlcjpwYXNz" not in result
+    assert "dXNlcj" not in result
+    assert "Authorization: Basic ***" in result
+
+
+def test_sanitize_text_masks_authorization_basic_without_colon():
+    result = sanitize_text("Request failed with Authorization Basic dXNlcjpwYXNz")
+    assert "dXNlcjpwYXNz" not in result
+    assert "dXNlcj" not in result
+    assert "Authorization Basic ***" in result
+
+
+def test_sanitize_text_masks_bare_bearer_token():
+    result = sanitize_text("download failed: Bearer SECRET_TOKEN_123456")
+    assert "SECRET_TOKEN_123456" not in result
+    assert "SECRET_T" not in result
+    assert "Bearer ***" in result
+
+
+def test_sanitize_url_removes_userinfo_and_sensitive_query():
+    result = sanitize_url(
+        "https://user:password@example.com/path/file.mp4?token=SECRET_TOKEN_123456"
+    )
+    assert "user:password@" not in result
+    assert "password" not in result
+    assert "SECRET_TOKEN_123456" not in result
+    assert "SECRET_T" not in result
+    assert "example.com/path/file.mp4" in result
+    assert "token=%2A%2A%2A" in result or "token=***" in result
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://cdn.example.com/token/SECRET_TOKEN_123456/video.mp4",
+        "https://cdn.example.com/access_token=SECRET_TOKEN_123456/video.mp4",
+    ],
+)
+def test_sanitize_url_masks_sensitive_path_segments(url):
+    result = sanitize_text(f"download failed: {url}")
+
+    assert "cdn.example.com" in result
+    assert "video.mp4" in result
+    assert "SECRET_TOKEN_123456" not in result
+    assert "SECRET_T" not in result
+
+
+def test_sanitize_exception_masks_posix_path_without_extension():
+    result = sanitize_exception(
+        PermissionError(13, "Permission denied", "/home/alice/secret/draft123")
+    )
+    assert "/home/alice/secret/draft123" not in result
+    assert "/home/alice/secret" not in result
+    assert "draft123" in result
 
 
 def test_sanitize_dict_masks_sensitive_keys():

@@ -65,23 +65,27 @@ class TestResolveSlotToTrack:
 
     def test_track_not_found_raises_slot_error(self, script):
         slot = {"type": "video", "track_name": "nonexistent"}
-        with pytest.raises(SlotError, match="轨道不存在"):
+        with pytest.raises(SlotError, match="轨道不存在") as exc:
             resolve_slot_to_track(script, slot)
+        assert exc.value.code == "S_TRACK_NOT_FOUND"
 
     def test_unknown_slot_type_raises_slot_error(self, script):
         slot = {"type": "unknown", "track_name": "video_main"}
-        with pytest.raises(SlotError, match="未知槽位类型"):
+        with pytest.raises(SlotError, match="未知槽位类型") as exc:
             resolve_slot_to_track(script, slot)
+        assert exc.value.code == "S_INVALID_SLOT"
 
     def test_missing_type_raises_slot_error(self, script):
         slot = {"track_name": "video_main"}
-        with pytest.raises(SlotError, match="缺少 type"):
+        with pytest.raises(SlotError, match="缺少 type") as exc:
             resolve_slot_to_track(script, slot)
+        assert exc.value.code == "S_INVALID_SLOT"
 
     def test_missing_track_name_raises_slot_error(self, script):
         slot = {"type": "video"}
-        with pytest.raises(SlotError, match="缺少 track_name"):
+        with pytest.raises(SlotError, match="缺少 track_name") as exc:
             resolve_slot_to_track(script, slot)
+        assert exc.value.code == "S_INVALID_SLOT"
 
 
 class TestValidateSlotSegmentIndex:
@@ -92,15 +96,18 @@ class TestValidateSlotSegmentIndex:
 
     def test_index_out_of_range_raises(self):
         track = _MockTrack("video_main", 2)
-        with pytest.raises(SlotError, match="越界"):
+        with pytest.raises(SlotError, match="越界") as exc:
             validate_slot_segment_index(track, 2, "slot1")
-        with pytest.raises(SlotError, match="越界"):
+        assert exc.value.code == "S_SEGMENT_NOT_FOUND"
+        with pytest.raises(SlotError, match="越界") as exc:
             validate_slot_segment_index(track, 5, "slot1")
+        assert exc.value.code == "S_SEGMENT_NOT_FOUND"
 
     def test_negative_index_raises(self):
         track = _MockTrack("video_main", 2)
-        with pytest.raises(SlotError, match="越界"):
+        with pytest.raises(SlotError, match="越界") as exc:
             validate_slot_segment_index(track, -1, "slot1")
+        assert exc.value.code == "S_SEGMENT_NOT_FOUND"
 
 
 class TestResolveAllSlots:
@@ -120,15 +127,65 @@ class TestResolveAllSlots:
         slots = [
             {"slot_id": "v1", "type": "video", "track_name": "video_main", "segment_index": 99},
         ]
-        with pytest.raises(SlotError, match="越界"):
+        with pytest.raises(SlotError, match="越界") as exc:
             resolve_all_slots(script, slots)
+        assert exc.value.code == "S_SEGMENT_NOT_FOUND"
+
+    @pytest.mark.parametrize(
+        "slot",
+        [
+            {"slot_id": "v1", "type": "video", "track_name": "video_main"},
+            {"slot_id": "v1", "type": "video", "track_name": "video_main", "segment_index": None},
+            {"slot_id": "v1", "type": "video", "track_name": "video_main", "segment_index": ""},
+            {"slot_id": "v1", "type": "video", "track_name": "video_main", "segment_index": "abc"},
+            {"slot_id": "v1", "type": "video", "track_name": "video_main", "segment_index": 1.5},
+        ],
+    )
+    def test_resolve_all_rejects_invalid_segment_index_shape(self, script, slot):
+        with pytest.raises(SlotError) as exc:
+            resolve_all_slots(script, [slot])
+        assert exc.value.code == "S_INVALID_SLOT"
+
+    def test_resolve_all_accepts_integer_string_segment_index(self, script):
+        slots = [
+            {"slot_id": "v1", "type": "video", "track_name": "video_main", "segment_index": "1"},
+        ]
+        result = resolve_all_slots(script, slots)
+        assert result["v1"].name == "video_main"
+
+    @pytest.mark.parametrize("segment_index", [-1, 99])
+    def test_resolve_all_rejects_out_of_range_segment_index(self, script, segment_index):
+        slots = [
+            {
+                "slot_id": "v1",
+                "type": "video",
+                "track_name": "video_main",
+                "segment_index": segment_index,
+            },
+        ]
+        with pytest.raises(SlotError) as exc:
+            resolve_all_slots(script, slots)
+        assert exc.value.code == "S_SEGMENT_NOT_FOUND"
 
     def test_missing_slot_id_raises(self, script):
         slots = [
             {"type": "video", "track_name": "video_main", "segment_index": 0},
         ]
-        with pytest.raises(SlotError, match="缺少 slot_id"):
+        with pytest.raises(SlotError, match="缺少 slot_id") as exc:
             resolve_all_slots(script, slots)
+        assert exc.value.code == "S_INVALID_SLOT"
+
+    def test_duplicate_slot_id_raises_structured_error(self, script):
+        slots = [
+            {"slot_id": "dup", "type": "video", "track_name": "video_main", "segment_index": 0},
+            {"slot_id": "dup", "type": "audio", "track_name": "audio_bgm", "segment_index": 0},
+        ]
+        with pytest.raises(SlotError) as exc:
+            resolve_all_slots(script, slots)
+        assert exc.value.code == "S_INVALID_SLOT"
+        assert exc.value.details["slot_id"] == "dup"
+        assert exc.value.details["first_index"] == 0
+        assert exc.value.details["duplicate_index"] == 1
 
     def test_empty_slots_returns_empty_dict(self, script):
         result = resolve_all_slots(script, [])

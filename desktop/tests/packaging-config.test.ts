@@ -63,6 +63,8 @@ describe('desktop packaging config', () => {
     expect(guide).toContain('未公证');
     expect(guide).toContain('## 首次使用');
     expect(guide).toContain('https://api.vectcut.com');
+    expect(guide).toContain('http://127.0.0.1:9001');
+    expect(guide).not.toContain('http://127.0.0.1:8000');
     expect(guide).toContain('确认草稿目录自动检测结果');
     expect(guide).toContain('保存设置');
     expect(guide).toContain('开始使用');

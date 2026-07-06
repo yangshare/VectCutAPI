@@ -5,11 +5,12 @@
 
 from __future__ import annotations
 
+import re
 from typing import Dict, List
 
 from pyJianYingDraft.track import Track_type
 
-from vectcut.core.errors import SlotError
+from vectcut.core.errors import make_error
 
 
 def _map_slot_type_to_track_type(slot_type: str) -> Track_type:
@@ -26,7 +27,11 @@ def _map_slot_type_to_track_type(slot_type: str) -> Track_type:
         "subtitle": Track_type.text,
     }
     if slot_type not in mapping:
-        raise SlotError(f"未知槽位类型: {slot_type}")
+        raise make_error(
+            "S_INVALID_SLOT",
+            f"未知槽位类型: {slot_type}",
+            details={"slot_type": slot_type},
+        )
     return mapping[slot_type]
 
 
@@ -47,17 +52,27 @@ def resolve_slot_to_track(script, slot: dict):
     track_name = slot.get("track_name")
 
     if not slot_type:
-        raise SlotError(f"槽位缺少 type 字段: {slot}")
+        raise make_error(
+            "S_INVALID_SLOT",
+            f"槽位缺少 type 字段: {slot}",
+            details={"slot": slot},
+        )
     if not track_name:
-        raise SlotError(f"槽位缺少 track_name 字段: {slot}")
+        raise make_error(
+            "S_INVALID_SLOT",
+            f"槽位缺少 track_name 字段: {slot}",
+            details={"slot": slot},
+        )
 
     track_type = _map_slot_type_to_track_type(slot_type)
 
     try:
         track = script.get_imported_track(track_type, name=track_name)
     except Exception as e:
-        raise SlotError(
-            f"轨道不存在: track_type={track_type.name}, track_name={track_name} ({e})"
+        raise make_error(
+            "S_TRACK_NOT_FOUND",
+            f"轨道不存在: track_type={track_type.name}, track_name={track_name} ({e})",
+            details={"track_type": track_type.name, "track_name": track_name},
         ) from e
 
     return track
@@ -76,9 +91,44 @@ def validate_slot_segment_index(track, segment_index: int, slot_id: str) -> None
     """
     n = len(track.segments)
     if segment_index < 0 or segment_index >= n:
-        raise SlotError(
-            f"槽位 {slot_id} 的 segment_index {segment_index} 越界（轨道 {track.name} 有 {n} 个片段）"
+        raise make_error(
+            "S_SEGMENT_NOT_FOUND",
+            f"槽位 {slot_id} 的 segment_index {segment_index} 越界（轨道 {track.name} 有 {n} 个片段）",
+            details={
+                "slot_id": slot_id,
+                "segment_index": segment_index,
+                "track_name": track.name,
+                "segment_count": n,
+            },
         )
+
+
+def parse_slot_segment_index(slot: dict) -> int:
+    slot_id = slot.get("slot_id", "")
+    if "segment_index" not in slot:
+        raise make_error(
+            "S_INVALID_SLOT",
+            "槽位配置缺少 segment_index",
+            details={"slot_id": slot_id, "slot": slot},
+        )
+
+    value = slot.get("segment_index")
+    if isinstance(value, bool) or value is None:
+        raise make_error(
+            "S_INVALID_SLOT",
+            "槽位 segment_index 必须是整数",
+            details={"slot_id": slot_id, "segment_index": value},
+        )
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.strip() and re.fullmatch(r"-?\d+", value.strip()):
+        return int(value.strip())
+
+    raise make_error(
+        "S_INVALID_SLOT",
+        "槽位 segment_index 必须是整数",
+        details={"slot_id": slot_id, "segment_index": value},
+    )
 
 
 def resolve_all_slots(script, slots: List[dict]) -> Dict[str, object]:
@@ -97,12 +147,28 @@ def resolve_all_slots(script, slots: List[dict]) -> Dict[str, object]:
         SlotError: 任一槽位解析或校验失败。
     """
     result: Dict[str, object] = {}
-    for slot in slots:
+    first_indices: Dict[str, int] = {}
+    for index, slot in enumerate(slots):
         slot_id = slot.get("slot_id")
         if not slot_id:
-            raise SlotError(f"槽位缺少 slot_id 字段: {slot}")
+            raise make_error(
+                "S_INVALID_SLOT",
+                f"槽位缺少 slot_id 字段: {slot}",
+                details={"slot": slot},
+            )
+        if slot_id in result:
+            raise make_error(
+                "S_INVALID_SLOT",
+                f"槽位配置包含重复 slot_id: {slot_id}",
+                details={
+                    "slot_id": slot_id,
+                    "first_index": first_indices[slot_id],
+                    "duplicate_index": index,
+                },
+            )
         track = resolve_slot_to_track(script, slot)
-        segment_index = slot.get("segment_index", 0)
+        segment_index = parse_slot_segment_index(slot)
         validate_slot_segment_index(track, segment_index, slot_id)
+        first_indices[slot_id] = index
         result[slot_id] = track
     return result

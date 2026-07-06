@@ -3,7 +3,7 @@
 脱敏规则：
   - 素材路径：仅保留文件名
   - SRT 内容：仅记录字节数/行数
-  - 下载 token：仅保留前 8 位
+  - 下载 token：替换为固定占位
   - 敏感字段（password/token/api_key/secret）：替换为 ***
 """
 from __future__ import annotations
@@ -11,15 +11,60 @@ from __future__ import annotations
 import logging
 import logging.handlers
 import os
+import re
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Dict
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 
-_SENSITIVE_KEY_PARTS = ("password", "token", "secret")
+_SENSITIVE_KEY_PARTS = ("password", "token", "secret", "credential")
 _SENSITIVE_KEYS = {"apikey", "accesskey", "accesssecret"}
 _MANAGED_HANDLER_ATTR = "_vectcut_managed"
 _HANDLER_KIND_ATTR = "_vectcut_handler_kind"
+_URL_PATTERN = re.compile(r"https?://[^\s'\"<>]+")
+_QUOTED_PATH_PATTERN = re.compile(
+    r"(?P<quote>['\"])(?P<path>(?:[A-Za-z]:[\\/]|/)[^'\"]+"
+    r"\.(?:mp4|mov|m4v|mp3|wav|m4a|aac|png|jpg|jpeg|webp|gif|zip|json|srt|txt))"
+    r"(?P=quote)",
+    re.IGNORECASE,
+)
+_SPACED_ABSOLUTE_PATH_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9_])(?:[A-Za-z]:[\\/]|/)[^'\"<>]*?\s+[^'\"<>]*?"
+    r"\.(?:mp4|mov|m4v|avi|mkv|flv|mp3|wav|aac|m4a|flac|jpg|jpeg|png|webp|bmp|gif|zip|json|srt|txt)\b",
+    re.IGNORECASE,
+)
+_SPACED_ABSOLUTE_PATH_NO_EXT_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9_])"
+    r"(?:[A-Za-z]:[\\/]|/(?:home|Users|tmp|var|private|mnt|media|opt|Volumes)/)"
+    r"(?=[^'\"<>\r\n]*\s)"
+    r"(?:[^\\/ \t\r\n'\"<>]+[\\/])*"
+    r"[^'\"<>\r\n]*[\\/][^\\/ \t\r\n'\"<>.,;:)]+",
+    re.IGNORECASE,
+)
+_WINDOWS_PATH_PATTERN = re.compile(r"[A-Za-z]:[\\/](?![\\/])[^\s'\"<>]+")
+_POSIX_PATH_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9_])/"
+    r"(?:home|Users|tmp|var|private|mnt|media|opt|Volumes)/"
+    r"(?:[^\s'\"<>/:]+/)*[^\s'\"<>/:]+",
+    re.IGNORECASE,
+)
+_AUTHORIZATION_CREDENTIAL_PATTERN = re.compile(
+    r"\b(?P<prefix>Authorization(?:\s*:\s*|\s+)[A-Za-z][A-Za-z0-9._~-]*\s+)"
+    r"(?P<value>[^\s'\"&;,)]+)",
+    re.IGNORECASE,
+)
+_BEARER_TOKEN_PATTERN = re.compile(
+    r"\b(?P<prefix>Bearer\s+)"
+    r"(?P<value>[^\s'\"&;,)]+)",
+    re.IGNORECASE,
+)
+_FREE_TEXT_SECRET_PATTERN = re.compile(
+    r"\b(?P<key>access[_-]?token|api[_-]?key|password|secret|credential|token)\b"
+    r"(?P<sep>\s*[=:]\s*|\s+)"
+    r"(?P<value>[^\s'\"&;,)]+)",
+    re.IGNORECASE,
+)
 
 
 class _DelayedDirectoryTimedRotatingFileHandler(logging.handlers.TimedRotatingFileHandler):
@@ -45,10 +90,130 @@ def sanitize_srt(srt: str) -> str:
 
 
 def sanitize_token(token: str) -> str:
-    """token 脱敏：仅保留前 8 位。"""
+    """token 脱敏：任意非空值替换为固定占位。"""
     if not token:
         return token
-    return token[:8] + "..."
+    return "***"
+
+
+def _sanitize_url_path(path: str) -> str:
+    if not path:
+        return path
+
+    segments = path.split("/")
+    sanitized: list[str] = []
+    mask_next = False
+    for segment in segments:
+        if not segment:
+            sanitized.append(segment)
+            continue
+
+        if mask_next:
+            sanitized.append(sanitize_token(segment))
+            mask_next = False
+            continue
+
+        if "=" in segment:
+            key, value = segment.split("=", 1)
+            if _is_sensitive_key(key):
+                sanitized.append(f"{key}={sanitize_token(value)}")
+                continue
+
+        sanitized.append(segment)
+        if _is_sensitive_key(segment):
+            mask_next = True
+
+    return "/".join(sanitized)
+
+
+def sanitize_url(url: str) -> str:
+    """URL 脱敏：保留 host/path，敏感 query 仅保留摘要。"""
+    if not url:
+        return url
+    parts = urlsplit(url)
+    if not parts.scheme or not parts.netloc:
+        return url
+
+    safe_netloc = parts.hostname or parts.netloc.rsplit("@", 1)[-1]
+    if ":" in safe_netloc and not safe_netloc.startswith("["):
+        safe_netloc = f"[{safe_netloc}]"
+    try:
+        port = parts.port
+    except ValueError:
+        port = None
+    if port is not None:
+        safe_netloc = f"{safe_netloc}:{port}"
+
+    safe_params = []
+    for key, value in parse_qsl(parts.query, keep_blank_values=True):
+        if _is_sensitive_key(key):
+            safe_params.append((key, sanitize_token(value)))
+    safe_query = urlencode(safe_params)
+    safe_path = _sanitize_url_path(parts.path)
+    return urlunsplit((parts.scheme, safe_netloc, safe_path, safe_query, ""))
+
+
+def sanitize_text(text: str) -> str:
+    """脱敏自由文本中的 URL query/token 和本地路径。"""
+    if not text:
+        return text
+
+    sanitized_urls: list[str] = []
+    sanitized_paths: list[str] = []
+
+    def _stash_url(match: re.Match[str]) -> str:
+        sanitized_urls.append(sanitize_url(match.group(0)))
+        return f"__VECTCUT_URL_{len(sanitized_urls) - 1}__"
+
+    def _restore_url(match: re.Match[str]) -> str:
+        return sanitized_urls[int(match.group(1))]
+
+    def _stash_path(path: str) -> str:
+        sanitized_paths.append(sanitize_path(path))
+        return f"__VECTCUT_PATH_{len(sanitized_paths) - 1}__"
+
+    def _restore_path(match: re.Match[str]) -> str:
+        return sanitized_paths[int(match.group(1))]
+
+    def _sanitize_secret(match: re.Match[str]) -> str:
+        return (
+            f"{match.group('key')}{match.group('sep')}"
+            f"{sanitize_token(match.group('value'))}"
+        )
+
+    text = _URL_PATTERN.sub(_stash_url, text)
+    text = _QUOTED_PATH_PATTERN.sub(
+        lambda match: f"{match.group('quote')}{_stash_path(match.group('path'))}{match.group('quote')}",
+        text,
+    )
+    text = _SPACED_ABSOLUTE_PATH_PATTERN.sub(
+        lambda match: _stash_path(match.group(0)), text
+    )
+    text = _SPACED_ABSOLUTE_PATH_NO_EXT_PATTERN.sub(
+        lambda match: _stash_path(match.group(0)), text
+    )
+    text = _WINDOWS_PATH_PATTERN.sub(
+        lambda match: _stash_path(match.group(0)), text
+    )
+    text = _POSIX_PATH_PATTERN.sub(
+        lambda match: _stash_path(match.group(0)), text
+    )
+    text = _AUTHORIZATION_CREDENTIAL_PATTERN.sub(
+        lambda match: f"{match.group('prefix')}{sanitize_token(match.group('value'))}",
+        text,
+    )
+    text = _BEARER_TOKEN_PATTERN.sub(
+        lambda match: f"{match.group('prefix')}{sanitize_token(match.group('value'))}",
+        text,
+    )
+    text = _FREE_TEXT_SECRET_PATTERN.sub(_sanitize_secret, text)
+    text = re.sub(r"__VECTCUT_PATH_(\d+)__", _restore_path, text)
+    return re.sub(r"__VECTCUT_URL_(\d+)__", _restore_url, text)
+
+
+def sanitize_exception(exc: BaseException) -> str:
+    """异常文本脱敏，避免下游 stderr/trace message 泄露路径或 token。"""
+    return sanitize_text(str(exc))
 
 
 def _is_sensitive_key(key: str) -> bool:

@@ -8,15 +8,35 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+from dataclasses import dataclass
+import hashlib
 import json
 import os
 import shutil
+import time
+import uuid
 import zipfile
 from pathlib import Path
-from typing import Optional
+import re
+from typing import Iterator, Optional
 
 from vectcut.core.config import load_config
-from vectcut.core.errors import SlotError, TemplateError
+from vectcut.core.errors import VectCutError
+from vectcut.core.errors import make_error
+
+_MAX_TEMPLATE_ZIP_FILES = 10_000
+_WINDOWS_ABSOLUTE_ZIP_MEMBER_RE = re.compile(r"^[A-Za-z]:[\\/]")
+_TEMPLATE_LOCK_POLL_SECONDS = 0.05
+
+
+@dataclass(frozen=True)
+class StagedTemplateZip:
+    template_id: str
+    extract_dir: Path
+    zip_path: Path
+    final_extract_dir: Path
+    final_zip_path: Path
 
 
 def _ensure_parent(path: str | os.PathLike) -> Path:
@@ -24,6 +44,46 @@ def _ensure_parent(path: str | os.PathLike) -> Path:
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def _safe_template_lock_name(template_id: str) -> str:
+    safe = re.sub(r"[^A-Za-z0-9_-]+", "_", str(template_id)).strip("_") or "template"
+    digest = hashlib.sha256(str(template_id).encode("utf-8")).hexdigest()[:12]
+    return f"{safe[:80]}-{digest}.lock"
+
+
+@contextmanager
+def template_lock(template_id: str, timeout_seconds: float = 30.0) -> Iterator[None]:
+    """Acquire a cross-process per-template lock using atomic lock-file creation."""
+    cfg = load_config()
+    lock_dir = Path(cfg.template_folder) / ".locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / _safe_template_lock_name(template_id)
+    deadline = time.monotonic() + timeout_seconds
+    fd: int | None = None
+
+    while True:
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, f"pid={os.getpid()}\n".encode("utf-8"))
+            break
+        except FileExistsError as exc:
+            remaining = deadline - time.monotonic()
+            if timeout_seconds <= 0 or remaining <= 0:
+                raise TimeoutError(
+                    f"Timed out acquiring template lock for {template_id}"
+                ) from exc
+            time.sleep(min(_TEMPLATE_LOCK_POLL_SECONDS, remaining))
+
+    try:
+        yield
+    finally:
+        if fd is not None:
+            os.close(fd)
+        try:
+            lock_path.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def save_template_zip(template_id: str, zip_path: str) -> str:
@@ -34,24 +94,213 @@ def save_template_zip(template_id: str, zip_path: str) -> str:
     return str(dst)
 
 
+def _validate_zip_member_path(extract_dir: Path, member_name: str) -> None:
+    if _is_absolute_zip_member_name(member_name):
+        raise make_error(
+            "T_INVALID_ZIP",
+            "ZIP 文件包含非法路径",
+            details={"entry": member_name},
+        )
+
+    target = (extract_dir / member_name).resolve()
+    root = extract_dir.resolve()
+    try:
+        target.relative_to(root)
+    except ValueError as exc:
+        raise make_error(
+            "T_INVALID_ZIP",
+            "ZIP 文件包含非法路径",
+            details={"entry": member_name},
+        ) from exc
+
+
+def _is_absolute_zip_member_name(member_name: str) -> bool:
+    if not member_name:
+        return False
+    if _WINDOWS_ABSOLUTE_ZIP_MEMBER_RE.match(member_name):
+        return True
+    return member_name.startswith(("/", "\\\\", "//", "\\"))
+
+
+def _validate_template_zip_members(
+    zf: zipfile.ZipFile,
+    extract_dir: Path,
+    max_uncompressed_bytes: int,
+) -> None:
+    infos = zf.infolist()
+    if len(infos) > _MAX_TEMPLATE_ZIP_FILES:
+        raise make_error(
+            "T_TOO_LARGE",
+            details={
+                "file_count": len(infos),
+                "max_file_count": _MAX_TEMPLATE_ZIP_FILES,
+            },
+        )
+
+    total_size = 0
+    for info in infos:
+        _validate_zip_member_path(extract_dir, info.filename)
+        if callable(getattr(info, "is_dir", None)) and info.is_dir():
+            continue
+
+        file_size = int(getattr(info, "file_size", 0))
+        if file_size > max_uncompressed_bytes:
+            raise make_error(
+                "T_TOO_LARGE",
+                details={
+                    "entry": info.filename,
+                    "file_size": file_size,
+                    "max_bytes": max_uncompressed_bytes,
+                },
+            )
+
+        total_size += file_size
+        if total_size > max_uncompressed_bytes:
+            raise make_error(
+                "T_TOO_LARGE",
+                details={
+                    "total_uncompressed_size": total_size,
+                    "max_bytes": max_uncompressed_bytes,
+                },
+            )
+
+
+def stage_extract_template_zip(template_id: str, uploaded_zip_path: str) -> StagedTemplateZip:
+    """将模板 ZIP 解压到 staging 目录，不修改已有正式模板。"""
+    cfg = load_config()
+    template_root = Path(cfg.template_folder)
+    template_root.mkdir(parents=True, exist_ok=True)
+    stored_zip = template_root / f"{template_id}.zip"
+    extract_dir = Path(cfg.template_folder) / template_id
+    staging_id = uuid.uuid4().hex
+    staging_zip = template_root / f"{template_id}.tmp-{staging_id}.zip"
+    staging_dir = template_root / f"{template_id}.tmp-{staging_id}"
+    shutil.copyfile(uploaded_zip_path, staging_zip)
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    validated = False
+
+    try:
+        with zipfile.ZipFile(staging_zip) as zf:
+            max_bytes = int(cfg.max_template_zip_mb) * 1024 * 1024
+            _validate_template_zip_members(zf, staging_dir, max_bytes)
+            zf.extractall(staging_dir)
+            validated = True
+    except zipfile.BadZipFile as exc:
+        raise make_error("T_INVALID_ZIP", details={"template_id": template_id}) from exc
+    except VectCutError:
+        raise
+    finally:
+        if not validated and staging_dir.exists():
+            shutil.rmtree(staging_dir)
+        if not validated and staging_zip.exists():
+            staging_zip.unlink()
+
+    return StagedTemplateZip(
+        template_id=template_id,
+        extract_dir=staging_dir,
+        zip_path=staging_zip,
+        final_extract_dir=extract_dir,
+        final_zip_path=stored_zip,
+    )
+
+
+def commit_staged_template(stage: StagedTemplateZip) -> str:
+    """把已完成结构和语义校验的 staging 模板切换为正式模板。"""
+    backup_id = uuid.uuid4().hex
+    backup_extract_dir = stage.final_extract_dir.with_name(
+        f"{stage.final_extract_dir.name}.bak-{backup_id}"
+    )
+    backup_zip_path = stage.final_zip_path.with_name(
+        f"{stage.final_zip_path.name}.bak-{backup_id}"
+    )
+    backed_up_dir = False
+    backed_up_zip = False
+    installed_dir = False
+    installed_zip = False
+
+    try:
+        if stage.final_extract_dir.exists():
+            stage.final_extract_dir.replace(backup_extract_dir)
+            backed_up_dir = True
+        if stage.final_zip_path.exists():
+            os.replace(stage.final_zip_path, backup_zip_path)
+            backed_up_zip = True
+
+        stage.extract_dir.replace(stage.final_extract_dir)
+        installed_dir = True
+        os.replace(stage.zip_path, stage.final_zip_path)
+        installed_zip = True
+    except Exception:
+        if (installed_dir or backed_up_dir) and stage.final_extract_dir.exists():
+            shutil.rmtree(stage.final_extract_dir)
+        if (installed_zip or backed_up_zip) and stage.final_zip_path.exists():
+            stage.final_zip_path.unlink()
+        if backed_up_dir and backup_extract_dir.exists():
+            backup_extract_dir.replace(stage.final_extract_dir)
+        if backed_up_zip and backup_zip_path.exists():
+            os.replace(backup_zip_path, stage.final_zip_path)
+        raise
+    else:
+        if backup_extract_dir.exists():
+            shutil.rmtree(backup_extract_dir)
+        if backup_zip_path.exists():
+            backup_zip_path.unlink()
+    return str(stage.final_extract_dir)
+
+
+def cleanup_staged_template(stage: StagedTemplateZip) -> None:
+    """清理未提交的 staging 模板文件。"""
+    if stage.extract_dir.exists():
+        shutil.rmtree(stage.extract_dir)
+    if stage.zip_path.exists():
+        stage.zip_path.unlink()
+
+
 def extract_template_zip(template_id: str, uploaded_zip_path: str) -> str:
     """保存并解压模板 ZIP 到 ``template_folder/{template_id}/``。
 
-    - 先 copy 上传 zip 到 ``{template_id}.zip`` 留档；
-    - 若同名解包目录已存在，先 rmtree 再解压，保证幂等。
+    先在 staging zip / staging 解包目录中完成结构校验和解压，成功后再替换
+    正式 ``{template_id}.zip`` 和 ``{template_id}/``。
     """
-    cfg = load_config()
-    stored_zip = _ensure_parent(Path(cfg.template_folder) / f"{template_id}.zip")
-    shutil.copyfile(uploaded_zip_path, stored_zip)
+    stage = stage_extract_template_zip(template_id, uploaded_zip_path)
+    try:
+        return commit_staged_template(stage)
+    except Exception:
+        cleanup_staged_template(stage)
+        raise
 
-    extract_dir = Path(cfg.template_folder) / template_id
-    if extract_dir.exists():
-        shutil.rmtree(extract_dir)
-    extract_dir.mkdir(parents=True, exist_ok=True)
 
-    with zipfile.ZipFile(stored_zip) as zf:
-        zf.extractall(extract_dir)
-    return str(extract_dir)
+def get_template_draft_content_path_from_dir(
+    template_id: str, extract_dir: str | os.PathLike
+) -> str:
+    """返回指定解包目录里的 draft_content.json；缺失时回退 draft_info.json。"""
+    extract_dir = Path(extract_dir)
+    primary = extract_dir / "draft_content.json"
+    if primary.is_file():
+        return str(primary)
+    fallback = extract_dir / "draft_info.json"
+    if fallback.is_file():
+        return str(fallback)
+    raise make_error(
+        "T_NO_DRAFT_CONTENT",
+        f"模板 {template_id} 缺少 draft_content.json / draft_info.json",
+        details={"template_id": template_id},
+    )
+
+
+def require_template_draft_content_path_from_dir(
+    template_id: str, extract_dir: str | os.PathLike
+) -> str:
+    """返回指定解包目录里的 draft_content.json；模板导入语义校验不允许 fallback。"""
+    extract_dir = Path(extract_dir)
+    primary = extract_dir / "draft_content.json"
+    if primary.is_file():
+        return str(primary)
+    raise make_error(
+        "T_NO_DRAFT_CONTENT",
+        f"模板 {template_id} 缺少 draft_content.json",
+        details={"template_id": template_id},
+    )
 
 
 def get_template_draft_content_path(template_id: str) -> str:
@@ -60,15 +309,8 @@ def get_template_draft_content_path(template_id: str) -> str:
     两者都不存在 → TemplateError。
     """
     cfg = load_config()
-    extract_dir = Path(cfg.template_folder) / template_id
-    primary = extract_dir / "draft_content.json"
-    if primary.is_file():
-        return str(primary)
-    fallback = extract_dir / "draft_info.json"
-    if fallback.is_file():
-        return str(fallback)
-    raise TemplateError(
-        f"模板 {template_id} 缺少 draft_content.json / draft_info.json"
+    return get_template_draft_content_path_from_dir(
+        template_id, Path(cfg.template_folder) / template_id
     )
 
 
@@ -89,7 +331,11 @@ def load_slot_config(template_id: str) -> list:
     cfg = load_config()
     target = Path(cfg.template_config_folder) / f"{template_id}_slots.json"
     if not target.is_file():
-        raise SlotError(f"模板 {template_id} 的槽位配置不存在")
+        raise make_error(
+            "S_NOT_FOUND",
+            f"模板 {template_id} 的槽位配置不存在",
+            details={"template_id": template_id},
+        )
     data = json.loads(target.read_text(encoding="utf-8"))
     return data.get("slots", [])
 

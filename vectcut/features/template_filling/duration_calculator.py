@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from vectcut.core.errors import RenderError
+from vectcut.core.errors import make_error
 
 
 def calculate_video_loop_fill(
@@ -35,10 +35,30 @@ def calculate_video_loop_fill(
         RenderError: 空列表或循环次数超限。
     """
     if not video_segments_durations:
-        raise RenderError("视频片段时长列表为空")
+        raise make_error("R_EMPTY_VIDEO", "视频片段时长列表为空")
 
     if target_duration <= 0:
-        raise RenderError("目标时长必须大于 0")
+        raise make_error(
+            "R_INVALID_DURATION",
+            "目标时长必须大于 0",
+            details={"target_duration": target_duration},
+        )
+
+    for index, dur in enumerate(video_segments_durations[:-1]):
+        if dur <= 0:
+            raise make_error(
+                "R_INVALID_DURATION",
+                "视频片段时长必须大于 0",
+                details={"segment_index": index, "duration": dur},
+            )
+
+    last_dur = video_segments_durations[-1]
+    if last_dur <= 0:
+        raise make_error(
+            "R_INVALID_DURATION",
+            "最后一段时长必须大于 0",
+            details={"last_segment_duration": last_dur},
+        )
 
     warnings: list[str] = []
     total = sum(video_segments_durations)
@@ -60,10 +80,6 @@ def calculate_video_loop_fill(
         return result, warnings
 
     # 总时长 < target：循环最后一段填满
-    last_dur = video_segments_durations[-1]
-    if last_dur <= 0:
-        raise RenderError("最后一段时长必须大于 0")
-
     # 计算需要循环多少次
     remaining = target_duration - total
     loop_count = 0
@@ -72,8 +88,10 @@ def calculate_video_loop_fill(
         loop_count += 1
 
     if loop_count > max_loop_count:
-        raise RenderError(
-            f"循环次数 {loop_count} 超过限制 {max_loop_count}"
+        raise make_error(
+            "R_LOOP_TOO_MANY",
+            f"循环次数 {loop_count} 超过限制 {max_loop_count}",
+            details={"loop_count": loop_count, "max_loop_count": max_loop_count},
         )
 
     if last_dur < min_last_segment_duration:
@@ -113,6 +131,19 @@ def calculate_bgm_alignment(
         (对齐后时长, warnings)
     """
     warnings: list[str] = []
+
+    if target_duration <= 0:
+        raise make_error(
+            "R_INVALID_DURATION",
+            "目标时长必须大于 0",
+            details={"target_duration": target_duration},
+        )
+    if bgm_duration <= 0:
+        raise make_error(
+            "R_INVALID_DURATION",
+            "BGM 时长必须大于 0",
+            details={"bgm_duration": bgm_duration},
+        )
 
     if bgm_duration >= target_duration:
         return target_duration, warnings

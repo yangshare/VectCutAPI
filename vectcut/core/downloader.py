@@ -9,6 +9,20 @@ import requests
 import shutil
 from requests.exceptions import RequestException, Timeout
 
+from vectcut.core.logger import sanitize_path, sanitize_text, sanitize_url
+
+
+def _decode_stderr(stderr) -> str:
+    if stderr is None:
+        return ""
+    if isinstance(stderr, bytes):
+        return stderr.decode("utf-8", errors="replace")
+    return str(stderr)
+
+
+def _ffmpeg_error(stderr) -> str:
+    return sanitize_text(_decode_stderr(stderr))
+
 
 def download_video(video_url, draft_name, material_name):
     """
@@ -27,7 +41,7 @@ def download_video(video_url, draft_name, material_name):
 
     # Check if file already exists
     if os.path.exists(local_path):
-        print(f"Video file already exists: {local_path}")
+        print(f"Video file already exists: {sanitize_path(local_path)}")
         return local_path
 
     try:
@@ -41,7 +55,7 @@ def download_video(video_url, draft_name, material_name):
         subprocess.run(command, check=True, capture_output=True)
         return local_path
     except subprocess.CalledProcessError as e:
-        raise Exception(f"Failed to download video: {e.stderr.decode('utf-8')}")
+        raise Exception(f"Failed to download video: {_ffmpeg_error(e.stderr)}")
 
 
 def download_image(image_url, draft_name, material_name):
@@ -61,7 +75,7 @@ def download_image(image_url, draft_name, material_name):
 
     # Check if file already exists
     if os.path.exists(local_path):
-        print(f"Image file already exists: {local_path}")
+        print(f"Image file already exists: {sanitize_path(local_path)}")
         return local_path
 
     try:
@@ -78,7 +92,7 @@ def download_image(image_url, draft_name, material_name):
         subprocess.run(command, check=True, capture_output=True)
         return local_path
     except subprocess.CalledProcessError as e:
-        raise Exception(f"Failed to download image: {e.stderr.decode('utf-8')}")
+        raise Exception(f"Failed to download image: {_ffmpeg_error(e.stderr)}")
 
 
 def download_audio(audio_url, draft_name, material_name):
@@ -98,7 +112,7 @@ def download_audio(audio_url, draft_name, material_name):
 
     # Check if file already exists
     if os.path.exists(local_path):
-        print(f"Audio file already exists: {local_path}")
+        print(f"Audio file already exists: {sanitize_path(local_path)}")
         return local_path
 
     try:
@@ -114,7 +128,7 @@ def download_audio(audio_url, draft_name, material_name):
         subprocess.run(command, check=True, capture_output=True, text=True)
         return local_path
     except subprocess.CalledProcessError as e:
-        raise Exception(f"Failed to download audio:\n{e.stderr}")
+        raise Exception(f"Failed to download audio:\n{_ffmpeg_error(e.stderr)}")
 
 
 def download_file(url: str, local_filename, max_retries=3, timeout=180):
@@ -126,16 +140,19 @@ def download_file(url: str, local_filename, max_retries=3, timeout=180):
         # 创建目标目录（如果不存在）
         if directory and not os.path.exists(directory):
             os.makedirs(directory, exist_ok=True)
-            print(f"Created directory: {directory}")
+            print(f"Created directory: {sanitize_path(directory)}")
 
-        print(f"Copying local file: {url} to {local_filename}")
+        print(
+            "Copying local file: "
+            f"{sanitize_path(url)} to {sanitize_path(local_filename)}"
+        )
         start_time = time.time()
 
         # 复制文件
         shutil.copy2(url, local_filename)
 
         print(f"Copy completed in {time.time()-start_time:.2f} seconds")
-        print(f"File saved as: {os.path.abspath(local_filename)}")
+        print(f"File saved as: {sanitize_path(os.path.abspath(local_filename))}")
         return True
 
     # 原有的下载逻辑
@@ -150,13 +167,13 @@ def download_file(url: str, local_filename, max_retries=3, timeout=180):
                 print(f"Retrying in {wait_time} seconds... (Attempt {retries+1}/{max_retries})")
                 time.sleep(wait_time)
 
-            print(f"Downloading file: {local_filename}")
+            print(f"Downloading file: {sanitize_path(local_filename)}")
             start_time = time.time()
 
             # Create directory (if it doesn't exist)
             if directory and not os.path.exists(directory):
                 os.makedirs(directory, exist_ok=True)
-                print(f"Created directory: {directory}")
+                print(f"Created directory: {sanitize_path(directory)}")
 
             # Add headers
             headers = {
@@ -190,17 +207,17 @@ def download_file(url: str, local_filename, max_retries=3, timeout=180):
                     # print() # Original newline
                     pass
                 print(f"Download completed in {time.time()-start_time:.2f} seconds")
-                print(f"File saved as: {os.path.abspath(local_filename)}")
+                print(f"File saved as: {sanitize_path(os.path.abspath(local_filename))}")
                 return True
 
         except Timeout:
             print(f"Download timed out after {timeout} seconds")
         except RequestException as e:
-            print(f"Request failed: {e}")
+            print(f"Request failed: {type(e).__name__}")
         except Exception as e:
-            print(f"Unexpected error during download: {e}")
+            print(f"Unexpected error during download: {type(e).__name__}")
 
         retries += 1
 
-    print(f"Download failed after {max_retries} attempts for URL: {url}")
+    print(f"Download failed after {max_retries} attempts for URL: {sanitize_text(url)}")
     return False

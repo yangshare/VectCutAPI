@@ -6,8 +6,75 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from pyJianYingDraft.local_materials import Audio_material, Video_material
+
+from vectcut.core.errors import make_error
+
+
+def _require_metadata_dict(metadata: Any, *, material_type: str) -> dict:
+    if not isinstance(metadata, dict):
+        raise make_error(
+            "R_INVALID_PATH",
+            "素材元数据必须是对象",
+            details={
+                "material_type": material_type,
+                "field": "metadata",
+                "metadata_type": type(metadata).__name__,
+            },
+        )
+    return metadata
+
+
+def _require_path(metadata: dict, *, material_type: str) -> str:
+    path = metadata.get("path")
+    if not isinstance(path, str) or not path.strip():
+        raise make_error(
+            "R_INVALID_PATH",
+            "素材路径缺失或非法",
+            details={"material_type": material_type, "field": "path"},
+        )
+    return path
+
+
+def _require_positive_number(
+    metadata: dict,
+    field: str,
+    *,
+    material_type: str,
+    error_code: str,
+) -> float:
+    value: Any = metadata.get(field)
+    if isinstance(value, bool):
+        value = None
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        numeric = 0.0
+    if numeric <= 0:
+        raise make_error(
+            error_code,
+            f"素材字段 {field} 缺失或非法",
+            details={"material_type": material_type, "field": field},
+        )
+    return numeric
+
+
+def _require_positive_int(metadata: dict, field: str, *, material_type: str) -> int:
+    numeric = _require_positive_number(
+        metadata,
+        field,
+        material_type=material_type,
+        error_code="R_INVALID_PATH",
+    )
+    if not numeric.is_integer():
+        raise make_error(
+            "R_INVALID_PATH",
+            f"素材字段 {field} 缺失或非法",
+            details={"material_type": material_type, "field": field},
+        )
+    return int(numeric)
 
 
 def build_video_material_from_metadata(metadata: dict) -> Video_material:
@@ -23,10 +90,16 @@ def build_video_material_from_metadata(metadata: dict) -> Video_material:
     Returns:
         Video_material 实例，path 已设置，remote_url 为 None。
     """
-    path = metadata["path"]
-    duration = metadata["duration"]
-    width = metadata["width"]
-    height = metadata["height"]
+    metadata = _require_metadata_dict(metadata, material_type="video")
+    path = _require_path(metadata, material_type="video")
+    duration = _require_positive_number(
+        metadata,
+        "duration",
+        material_type="video",
+        error_code="R_INVALID_DURATION",
+    )
+    width = _require_positive_int(metadata, "width", material_type="video")
+    height = _require_positive_int(metadata, "height", material_type="video")
 
     mat = Video_material(
         material_type="video",
@@ -52,8 +125,14 @@ def build_audio_material_from_metadata(metadata: dict) -> Audio_material:
     Returns:
         Audio_material 实例，path 已设置，remote_url 为 None。
     """
-    path = metadata["path"]
-    duration = metadata["duration"]
+    metadata = _require_metadata_dict(metadata, material_type="audio")
+    path = _require_path(metadata, material_type="audio")
+    duration = _require_positive_number(
+        metadata,
+        "duration",
+        material_type="audio",
+        error_code="R_INVALID_DURATION",
+    )
 
     mat = Audio_material(
         remote_url="placeholder://metadata",
@@ -79,9 +158,10 @@ def build_image_material_from_metadata(metadata: dict) -> Video_material:
     Returns:
         Video_material 实例（material_type="photo"），path 已设置，remote_url 为 None。
     """
-    path = metadata["path"]
-    width = metadata["width"]
-    height = metadata["height"]
+    metadata = _require_metadata_dict(metadata, material_type="image")
+    path = _require_path(metadata, material_type="image")
+    width = _require_positive_int(metadata, "width", material_type="image")
+    height = _require_positive_int(metadata, "height", material_type="image")
 
     mat = Video_material(
         material_type="photo",

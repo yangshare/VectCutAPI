@@ -70,6 +70,7 @@ def test_full_workflow(temp_storage_dirs, mock_load_template, sample_template_zi
             type=s["type"],
             track_name=s["track_name"],
             segment_index=s["segment_index"],
+            required=s["slot_id"] == video_slot_id,
         )
         for s in import_resp.slots
     ]
@@ -126,7 +127,7 @@ def test_full_workflow_subtitle_and_cover_skip(
     subtitle_slot = next(s for s in import_resp.slots if s["type"] == "subtitle")
     cover_slot = {
         "slot_id": "cover_img_0", "name": "封面", "type": "cover_image",
-        "track_name": "cover", "segment_index": 0,
+        "track_name": "video_main", "segment_index": 0,
     }
     save_req = SaveSlotConfigRequest(
         template_id="tpl_skip",
@@ -163,48 +164,52 @@ def test_full_workflow_subtitle_and_cover_skip(
 
 
 def test_import_invalid_id_raises(temp_storage_dirs):
-    """非法 template_id → TemplateError（含"非法"）。"""
-    with pytest.raises(TemplateError, match="非法"):
+    """非法 template_id → T_INVALID_ID。"""
+    with pytest.raises(TemplateError, match="非法") as exc:
         service.import_template("非法!!", "E:/nonexistent.zip")
+    assert exc.value.code == "T_INVALID_ID"
 
 
 def test_import_template_not_zip_raises(temp_storage_dirs, mock_load_template, tmp_path):
-    """非 zip 文件 → zipfile.BadZipFile（storage.extract_template_zip 抛异常）。"""
+    """非 zip 文件 → T_INVALID_ZIP。"""
     fake_zip = tmp_path / "not_a_zip.zip"
     fake_zip.write_bytes(b"not a zip")
-    with pytest.raises(zipfile.BadZipFile):
+    with pytest.raises(TemplateError) as exc:
         service.import_template("tpl_bad", str(fake_zip))
+    assert exc.value.code == "T_INVALID_ZIP"
 
 
 def test_save_slot_config_template_not_imported(temp_storage_dirs):
-    """模板未导入 → get_template_draft_content_path 抛 TemplateError。"""
+    """模板未导入 → T_NO_DRAFT_CONTENT。"""
     req = SaveSlotConfigRequest(
         template_id="missing_tpl",
         slots=[SlotConfig(slot_id="v1", name="v", type="video",
                           track_name="main", segment_index=0)],
     )
-    with pytest.raises(TemplateError):
+    with pytest.raises(TemplateError) as exc:
         service.save_slot_config("missing_tpl", req)
+    assert exc.value.code == "T_NO_DRAFT_CONTENT"
 
 
 def test_save_slot_config_invalid_slot(
     temp_storage_dirs, mock_load_template, sample_template_zip
 ):
-    """slot_id 不在母版扫描结果 → SlotError（含"不存在"）。"""
+    """slot_id 不在母版扫描结果 → S_INVALID_SLOT。"""
     service.import_template("tpl_v", str(sample_template_zip))
     req = SaveSlotConfigRequest(
         template_id="tpl_v",
         slots=[SlotConfig(slot_id="ghost_slot", name="g", type="video",
                           track_name="ghost", segment_index=0)],
     )
-    with pytest.raises(SlotError, match="不存在"):
+    with pytest.raises(SlotError, match="不存在") as exc:
         service.save_slot_config("tpl_v", req)
+    assert exc.value.code == "S_INVALID_SLOT"
 
 
 def test_render_unknown_slot_raises(
     temp_storage_dirs, mock_load_template, sample_template_zip
 ):
-    """slot_values 含未知 slot_id → SlotError（含"未在配置中"）。"""
+    """slot_values 含未知 slot_id → S_INVALID_SLOT。"""
     service.import_template("tpl_u", str(sample_template_zip))
     # 手动注入只含一个 slot 的配置
     from vectcut.features.template_filling import storage
@@ -218,34 +223,38 @@ def test_render_unknown_slot_raises(
                                        "width": 100, "height": 100}},
         output_draft_name="out",
     )
-    with pytest.raises(SlotError, match="未在配置中"):
+    with pytest.raises(SlotError, match="未在配置中") as exc:
         service.render_draft("tpl_u", req)
+    assert exc.value.code == "S_INVALID_SLOT"
 
 
 def test_render_without_slot_config_raises(
     temp_storage_dirs, mock_load_template, sample_template_zip
 ):
-    """模板已导入但未保存槽位配置 → load_slot_config 抛 SlotError。"""
+    """模板已导入但未保存槽位配置 → S_NOT_FOUND。"""
     service.import_template("tpl_nc", str(sample_template_zip))
     req = RenderDraftRequest(
         template_id="tpl_nc",
         slot_values={},
         output_draft_name="out",
     )
-    with pytest.raises(SlotError, match="槽位配置不存在"):
+    with pytest.raises(SlotError, match="槽位配置不存在") as exc:
         service.render_draft("tpl_nc", req)
+    assert exc.value.code == "S_NOT_FOUND"
 
 
 def test_download_not_found_raises(temp_storage_dirs):
-    """storage 返回 None → RenderError（含"不存在"）。"""
-    with pytest.raises(RenderError, match="不存在"):
+    """storage 返回 None → R_TASK_NOT_FOUND。"""
+    with pytest.raises(RenderError, match="不存在") as exc:
         service.download_draft("draft_ghost")
+    assert exc.value.code == "R_TASK_NOT_FOUND"
 
 
 def test_download_empty_id_raises(temp_storage_dirs):
-    """空 draft_id → RenderError。"""
-    with pytest.raises(RenderError):
+    """空 draft_id → R_INVALID_TASK。"""
+    with pytest.raises(RenderError) as exc:
         service.download_draft("")
+    assert exc.value.code == "R_INVALID_TASK"
 
 
 def test_render_audio_slot_success(

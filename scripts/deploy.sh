@@ -107,10 +107,33 @@ compose_run() {
     COMPOSE_PROFILES= "${compose[@]}" "$@"
 }
 
+preflight_prod_auth() {
+    local htpasswd_path="${repo_root}/docker/ssl/.htpasswd"
+
+    if [[ -s "$htpasswd_path" ]]; then
+        return 0
+    fi
+
+    cat >&2 <<'EOF'
+Error: production Basic Auth is enabled; docker/ssl/.htpasswd must be a file that exists and is not empty.
+Create it before starting production nginx:
+
+  mkdir -p docker/ssl
+  htpasswd -c docker/ssl/.htpasswd admin
+
+Install htpasswd with apache2-utils (Debian/Ubuntu) or httpd-tools (RHEL/CentOS).
+EOF
+    exit 1
+}
+
 if [[ "$action" == "down" ]]; then
     echo "Stopping services ..."
     compose_run down
     exit 0
+fi
+
+if [[ "$mode" == "prod" ]]; then
+    preflight_prod_auth
 fi
 
 container_status() {
@@ -132,7 +155,7 @@ wait_for_health() {
     if [[ "$mode" == "prod" ]]; then
         echo "Waiting for production health check via nginx ..."
         for i in {1..12}; do
-            if curl -kfsS https://localhost/api/health >/dev/null 2>&1; then
+            if curl -kfsS https://localhost/health >/dev/null 2>&1; then
                 echo "Health check passed via nginx."
                 return 0
             fi
@@ -149,7 +172,7 @@ wait_for_health() {
 
     echo "Waiting for development health check ..."
     for i in {1..12}; do
-        if curl -fsS http://localhost:9001/api/health >/dev/null 2>&1; then
+        if curl -fsS http://localhost:9001/health >/dev/null 2>&1; then
             echo "Health check passed."
             return 0
         fi

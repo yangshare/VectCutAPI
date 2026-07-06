@@ -39,16 +39,44 @@ class TestCalculateVideoLoopFill:
 
     def test_loop_count_exceeds_max_raises_render_error(self):
         """4. 循环次数 > 10 → RenderError（含"超过限制"）。"""
-        with pytest.raises(RenderError, match="超过限制"):
+        with pytest.raises(RenderError, match="超过限制") as exc:
             # 总 1s, 最后一段 0.1s, target=10s → 需要 ~89 次循环
             calculate_video_loop_fill(
                 [0.9, 0.1], target_duration=10.0, max_loop_count=10
             )
+        assert exc.value.code == "R_LOOP_TOO_MANY"
 
     def test_empty_list_raises_render_error(self):
         """5. 视频空 → RenderError（含"为空"）。"""
-        with pytest.raises(RenderError, match="为空"):
+        with pytest.raises(RenderError, match="为空") as exc:
             calculate_video_loop_fill([], target_duration=10.0)
+        assert exc.value.code == "R_EMPTY_VIDEO"
+
+    def test_non_positive_target_duration_raises_code(self):
+        """target_duration <= 0 → R_INVALID_DURATION。"""
+        with pytest.raises(RenderError, match="目标时长") as exc:
+            calculate_video_loop_fill([1.0], target_duration=0)
+        assert exc.value.code == "R_INVALID_DURATION"
+
+    def test_non_positive_last_segment_duration_raises_code(self):
+        """最后一段时长 <= 0 → R_INVALID_DURATION。"""
+        with pytest.raises(RenderError, match="最后一段") as exc:
+            calculate_video_loop_fill([1.0, 0], target_duration=2.0)
+        assert exc.value.code == "R_INVALID_DURATION"
+
+    def test_any_non_positive_segment_duration_raises_code(self):
+        """任一视频段时长 <= 0 → R_INVALID_DURATION。"""
+        for durations in ([0, 5.0], [-1.0, 5.0]):
+            with pytest.raises(RenderError, match="片段时长") as exc:
+                calculate_video_loop_fill(durations, target_duration=3.0)
+            assert exc.value.code == "R_INVALID_DURATION"
+
+    def test_non_positive_last_segment_raises_even_when_truncating(self):
+        """截断分支也必须校验最后一段时长。"""
+        for durations in ([5.0, 0.0], [5.0, -1.0]):
+            with pytest.raises(RenderError, match="最后一段") as exc:
+                calculate_video_loop_fill(durations, target_duration=3.0)
+            assert exc.value.code == "R_INVALID_DURATION"
 
     def test_truncate_exact_boundary_keeps_full_segment(self):
         """恰好相等时保留完整段（不截断到 0）。"""
@@ -86,3 +114,15 @@ class TestCalculateBgmAlignment:
         )
         assert aligned == 20.0
         assert warnings == []
+
+    def test_non_positive_target_duration_raises_code(self):
+        """target_duration <= 0 → R_INVALID_DURATION。"""
+        with pytest.raises(RenderError, match="目标时长") as exc:
+            calculate_bgm_alignment(5.0, 0)
+        assert exc.value.code == "R_INVALID_DURATION"
+
+    def test_non_positive_bgm_duration_raises_code(self):
+        """bgm_duration <= 0 → R_INVALID_DURATION。"""
+        with pytest.raises(RenderError, match="BGM 时长") as exc:
+            calculate_bgm_alignment(0, 5.0)
+        assert exc.value.code == "R_INVALID_DURATION"
