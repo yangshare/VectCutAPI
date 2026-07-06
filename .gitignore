@@ -16,6 +16,11 @@ config.json
 venv/
 tmp/
 
+desktop/node_modules/
+desktop/out/
+desktop/dist/
+desktop/*.local
+
 .claude/
 .codegraph/
 CLAUDE.md
