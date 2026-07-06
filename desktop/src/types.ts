@@ -69,5 +69,5 @@ export interface VectCutApi {
   packTemplateFolder: (folderPath: string) => Promise<{ zipPath: string; sizeMB: number }>;
   readZipFile: (filePath: string) => Promise<ArrayBuffer>;
   getUserConfig: () => Promise<UserConfig>;
-  setUserConfig: (config: Partial<UserConfig>) => Promise<void>;
+  setUserConfig: (config: Partial<UserConfig>) => Promise<UserConfig>;
 }

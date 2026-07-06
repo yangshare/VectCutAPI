@@ -46,7 +46,7 @@ const api: VectCutApi = {
   // 配置存储（configStore.ts）
   getUserConfig: () => ipcRenderer.invoke('config:get') as Promise<UserConfig>,
   setUserConfig: (config: Partial<UserConfig>) =>
-    ipcRenderer.invoke('config:set', config) as Promise<void>,
+    ipcRenderer.invoke('config:set', config) as Promise<UserConfig>,
 };
 
 contextBridge.exposeInMainWorld('vectcut', api);
