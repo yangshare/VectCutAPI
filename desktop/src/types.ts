@@ -17,14 +17,14 @@ export interface MaterialMetadata {
 
 /** 字幕元数据 */
 export interface SubtitleMetadata {
-  start_time: number;  // 秒
-  end_time: number;
-  text: string;
+  slot_id: string;
+  srt_content: string;
 }
 
 /** 封面标题元数据 */
 export interface CoverTitleMetadata {
-  title: string;
+  slot_id: string;
+  text: string;
 }
 
 /** 槽位配置（保存到云端） */
@@ -62,12 +62,14 @@ export interface VectCutApi {
   selectImageFile: () => Promise<string | null>;
   selectSrtFile: () => Promise<string | null>;
   selectTemplateFolder: () => Promise<string | null>;
+  selectDraftSavePath: (suggestedName: string) => Promise<string | null>;
   probeMedia: (filePath: string) => Promise<ProbeResult>;
   detectJianyingDraftDir: () => Promise<string | null>;
   detectJianyingVersion: () => Promise<string | null>;
   importDraftToJianying: (zipPath: string) => Promise<{ draftDir: string }>;
   packTemplateFolder: (folderPath: string) => Promise<{ zipPath: string; sizeMB: number }>;
   readZipFile: (filePath: string) => Promise<ArrayBuffer>;
+  writeZipFile: (savePath: string, data: ArrayBuffer) => Promise<void>;
   getUserConfig: () => Promise<UserConfig>;
   setUserConfig: (config: Partial<UserConfig>) => Promise<UserConfig>;
 }

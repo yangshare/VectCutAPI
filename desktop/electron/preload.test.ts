@@ -44,6 +44,11 @@ describe('preload controlled IPC API', () => {
       expectedInvokeArgs: ['dialog:selectTemplateFolder'],
     },
     {
+      method: 'selectDraftSavePath',
+      args: ['draft-name'],
+      expectedInvokeArgs: ['dialog:selectDraftSavePath', 'draft-name'],
+    },
+    {
       method: 'probeMedia',
       args: ['C:/media/video.mp4'],
       expectedInvokeArgs: ['mediaProbe:probe', 'C:/media/video.mp4'],
@@ -72,6 +77,11 @@ describe('preload controlled IPC API', () => {
       method: 'readZipFile',
       args: ['C:/templates/template-a.zip'],
       expectedInvokeArgs: ['file:readZip', 'C:/templates/template-a.zip'],
+    },
+    {
+      method: 'writeZipFile',
+      args: ['C:/downloads/draft.zip', new ArrayBuffer(2)],
+      expectedInvokeArgs: ['file:writeZip', 'C:/downloads/draft.zip', new ArrayBuffer(2)],
     },
     {
       method: 'getUserConfig',
@@ -112,7 +122,9 @@ describe('preload controlled IPC API', () => {
       'selectTemplateFolder',
       'selectVideoFile',
       'setUserConfig',
-    ]);
+      'selectDraftSavePath',
+      'writeZipFile',
+    ].sort());
     expect(api).not.toHaveProperty('ipcRenderer');
   });
 
@@ -137,6 +149,17 @@ describe('preload controlled IPC API', () => {
     expect(result).toBeInstanceOf(ArrayBuffer);
     expect(Array.from(new Uint8Array(result))).toEqual([2, 3]);
     expect(electronMock.invoke).toHaveBeenCalledWith('file:readZip', 'C:/templates/template-a.zip');
+  });
+
+  test('rejects oversized zip writes before invoking IPC', async () => {
+    await import('./preload');
+    const [, api] = electronMock.exposeInMainWorld.mock.calls[0];
+    const oversized = new ArrayBuffer(100 * 1024 * 1024 + 1);
+
+    await expect(api.writeZipFile('C:/downloads/draft.zip', oversized)).rejects.toThrow(
+      'ZIP 文件过大',
+    );
+    expect(electronMock.invoke).not.toHaveBeenCalled();
   });
 
   test('renderer global types depend on shared types, not electron preload', () => {

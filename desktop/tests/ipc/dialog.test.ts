@@ -1,19 +1,26 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'fs/promises';
 import os from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { showOpenDialogMock } = vi.hoisted(() => ({
+const { showOpenDialogMock, showSaveDialogMock } = vi.hoisted(() => ({
   showOpenDialogMock: vi.fn(),
+  showSaveDialogMock: vi.fn(),
 }));
 
 vi.mock('electron', () => ({
   dialog: {
     showOpenDialog: showOpenDialogMock,
+    showSaveDialog: showSaveDialogMock,
   },
 }));
 
-import { readZipFile, registerDialogHandlers } from '../../electron/ipc/dialog';
+import {
+  readZipFile,
+  registerDialogHandlers,
+  selectDraftSavePath,
+  writeZipFile,
+} from '../../electron/ipc/dialog';
 
 type Handler = (_event?: unknown, ...args: unknown[]) => unknown;
 
@@ -33,6 +40,7 @@ function createFakeIpcMain() {
 describe('registerDialogHandlers', () => {
   beforeEach(() => {
     showOpenDialogMock.mockReset();
+    showSaveDialogMock.mockReset();
   });
 
   it('registers file and folder dialog channels', () => {
@@ -40,14 +48,16 @@ describe('registerDialogHandlers', () => {
 
     registerDialogHandlers(ipcMain as never);
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(6);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(8);
     expect(ipcMain.handle.mock.calls.map(([channel]) => channel)).toEqual([
       'dialog:selectVideoFile',
       'dialog:selectAudioFile',
       'dialog:selectImageFile',
       'dialog:selectSrtFile',
       'dialog:selectTemplateFolder',
+      'dialog:selectDraftSavePath',
       'file:readZip',
+      'file:writeZip',
     ]);
   });
 
@@ -99,6 +109,127 @@ describe('registerDialogHandlers', () => {
     registerDialogHandlers(ipcMain as never);
 
     await expect(handlers.get('dialog:selectTemplateFolder')?.()).resolves.toBeNull();
+  });
+
+  it('opens the draft save dialog with a sanitized zip filename and authorizes the selected path', async () => {
+    const { ipcMain, handlers } = createFakeIpcMain();
+    const savePath = join(os.tmpdir(), 'selected-draft.zip');
+    showSaveDialogMock.mockResolvedValue({ canceled: false, filePath: savePath });
+    registerDialogHandlers(ipcMain as never);
+
+    await expect(handlers.get('dialog:selectDraftSavePath')?.(undefined, '..\\bad/name')).resolves
+      .toBe(savePath);
+
+    expect(showSaveDialogMock).toHaveBeenCalledWith({
+      title: '保存草稿 ZIP',
+      defaultPath: 'name.zip',
+      filters: [{ name: 'ZIP 文件', extensions: ['zip'] }],
+    });
+  });
+
+  it('returns null when the draft save dialog is canceled', async () => {
+    const { ipcMain, handlers } = createFakeIpcMain();
+    showSaveDialogMock.mockResolvedValue({ canceled: true });
+    registerDialogHandlers(ipcMain as never);
+
+    await expect(handlers.get('dialog:selectDraftSavePath')?.(undefined, 'draft')).resolves
+      .toBeNull();
+  });
+
+  it.each(['', '   ', null])('rejects an invalid suggested draft name %#', async (suggestedName) => {
+    await expect(selectDraftSavePath(suggestedName as unknown as string)).rejects.toThrow(
+      '草稿文件名不能为空',
+    );
+    expect(showSaveDialogMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('writeZipFile', () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(os.tmpdir(), 'dialog-write-zip-'));
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('rejects unauthorized save paths', async () => {
+    const filePath = join(tempDir, 'draft.zip');
+    const data = new Uint8Array([0x50, 0x4b, 1, 2]).buffer;
+
+    await expect(writeZipFile(filePath, data)).rejects.toThrow('ZIP 保存路径未授权');
+  });
+
+  it('writes ArrayBuffer zip data after save dialog authorization and consumes the authorization', async () => {
+    const filePath = join(tempDir, 'draft.zip');
+    const data = new Uint8Array([0x50, 0x4b, 1, 2]).buffer;
+    showSaveDialogMock.mockResolvedValue({ canceled: false, filePath });
+
+    await selectDraftSavePath('draft.zip');
+    await writeZipFile(filePath, data);
+
+    await expect(readFile(filePath)).resolves.toEqual(Buffer.from([0x50, 0x4b, 1, 2]));
+    await expect(writeZipFile(filePath, data)).rejects.toThrow('ZIP 保存路径未授权');
+  });
+
+  it.each(['', '   ', null, { path: 'draft.zip' }])(
+    'rejects an invalid save path before writing %#',
+    async (savePath) => {
+      await expect(writeZipFile(savePath as unknown as string, new ArrayBuffer(0))).rejects.toThrow(
+        'ZIP 保存路径不能为空',
+      );
+    },
+  );
+
+  it('rejects a non-zip save path before writing', async () => {
+    const filePath = join(tempDir, 'draft.txt');
+
+    await expect(writeZipFile(filePath, new ArrayBuffer(0))).rejects.toThrow('仅支持 .zip 文件');
+  });
+
+  it('rejects data larger than the size limit', async () => {
+    const filePath = join(tempDir, 'draft.zip');
+
+    await expect(writeZipFile(filePath, new Uint8Array([1, 2, 3, 4]), 3)).rejects.toThrow(
+      'ZIP 文件过大',
+    );
+  });
+
+  it.each([null, 'zip', { bytes: [1, 2] }])('rejects invalid zip data %#', async (data) => {
+    const filePath = join(tempDir, 'draft.zip');
+
+    await expect(writeZipFile(filePath, data as never)).rejects.toThrow('ZIP 数据无效');
+  });
+
+  it('rejects symbolic link save paths and consumes the authorization', async () => {
+    const realPath = join(tempDir, 'real.zip');
+    const linkPath = join(tempDir, 'link.zip');
+    await writeFile(realPath, Buffer.from([]));
+    await symlink(realPath, linkPath);
+    showSaveDialogMock.mockResolvedValue({ canceled: false, filePath: linkPath });
+
+    await selectDraftSavePath('link.zip');
+    await expect(writeZipFile(linkPath, new ArrayBuffer(0))).rejects.toThrow(
+      'ZIP 保存路径不能是符号链接',
+    );
+    await expect(writeZipFile(linkPath, new ArrayBuffer(0))).rejects.toThrow(
+      'ZIP 保存路径未授权',
+    );
+  });
+
+  it('routes file:writeZip through the zip writer', async () => {
+    const { ipcMain, handlers } = createFakeIpcMain();
+    const filePath = join(tempDir, 'draft.zip');
+    const data = new Uint8Array([0x50, 0x4b]).buffer;
+    showSaveDialogMock.mockResolvedValue({ canceled: false, filePath });
+    registerDialogHandlers(ipcMain as never);
+
+    await handlers.get('dialog:selectDraftSavePath')?.(undefined, 'draft.zip');
+    await handlers.get('file:writeZip')?.(undefined, filePath, data);
+
+    await expect(readFile(filePath)).resolves.toEqual(Buffer.from([0x50, 0x4b]));
   });
 });
 

@@ -5,6 +5,8 @@ import type {
   UserConfig,
 } from '../src/types';
 
+const MAX_ZIP_BYTES = 100 * 1024 * 1024;
+
 const toArrayBuffer = (value: ArrayBuffer | Uint8Array): ArrayBuffer => {
   if (value instanceof ArrayBuffer) {
     return value;
@@ -22,6 +24,8 @@ const api: VectCutApi = {
   selectImageFile: () => ipcRenderer.invoke('dialog:selectImageFile') as Promise<string | null>,
   selectSrtFile: () => ipcRenderer.invoke('dialog:selectSrtFile') as Promise<string | null>,
   selectTemplateFolder: () => ipcRenderer.invoke('dialog:selectTemplateFolder') as Promise<string | null>,
+  selectDraftSavePath: (suggestedName: string) =>
+    ipcRenderer.invoke('dialog:selectDraftSavePath', suggestedName) as Promise<string | null>,
 
   // 媒体探测（mediaProbe.ts）
   probeMedia: (filePath: string) =>
@@ -42,6 +46,12 @@ const api: VectCutApi = {
   // 主进程 handler 负责 zip 扩展名、大小和路径来源校验。
   readZipFile: async (filePath: string) =>
     toArrayBuffer(await ipcRenderer.invoke('file:readZip', filePath) as ArrayBuffer | Uint8Array),
+  writeZipFile: (savePath: string, data: ArrayBuffer) => {
+    if (data.byteLength > MAX_ZIP_BYTES) {
+      return Promise.reject(new Error('ZIP 文件过大'));
+    }
+    return ipcRenderer.invoke('file:writeZip', savePath, data) as Promise<void>;
+  },
 
   // 配置存储（configStore.ts）
   getUserConfig: () => ipcRenderer.invoke('config:get') as Promise<UserConfig>,
