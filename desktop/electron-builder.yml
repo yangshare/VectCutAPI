@@ -1,0 +1,43 @@
+appId: com.vectcut.desktop
+productName: VectCut 模板套版
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+  - '!**/*.{ts,tsx,map}'
+  - '!tests/**'
+  - '!docs/**'
+
+win:
+  target:
+    - nsis
+    - portable
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  extraResources:
+    - from: node_modules/ffprobe-static/bin/win32/${arch}/ffprobe.exe
+      to: ffprobe/bin/ffprobe.exe
+
+nsis:
+  artifactName: ${productName}-Setup-${version}-${arch}.${ext}
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: VectCut 模板套版
+
+portable:
+  artifactName: ${productName}-Portable-${version}-${arch}.${ext}
+
+mac:
+  target:
+    - dmg
+  category: public.app-category.video
+  extraResources:
+    - from: node_modules/ffprobe-static/bin/darwin/${arch}/ffprobe
+      to: ffprobe/bin/ffprobe
+  # 代码签名（MVP 阶段留空，公测阶段填入开发者证书）
+  # identity: null
+
+dmg:
+  artifactName: ${productName}-${version}.${ext}
