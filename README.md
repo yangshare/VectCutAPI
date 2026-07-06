@@ -271,6 +271,17 @@ mcp_client.call_tool("add_text", {
 
 调用 `save_draft` 会在`run_http.py`当前目录下生成一个 `dfd_` 开头的文件夹，将其复制到剪映/CapCut 草稿目录，即可在应用中看到生成的草稿。
 
+## 部署
+
+详见 [部署指南](docs/deployment/README.md)。
+
+- 本地开发：`pip install -r requirements.txt && python run_http.py`
+- Docker 开发：`docker compose up -d --build`
+- 生产部署：`docker compose -f docker-compose.yml --profile production up -d --build`
+- 运维脚本：`./scripts/deploy.sh`、`./scripts/backup.sh`
+
+云端 API 基座规格见 `docs/superpowers/specs/2026-07-04-solution1-docker-deployment.md`。
+
 
 ## 社区与支持
 
