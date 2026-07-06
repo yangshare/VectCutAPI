@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, writeFile } from 'fs/promises';
 import os from 'os';
 import { join } from 'path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { importDraft, isVersionSupported } from '../../electron/ipc/jianyingDir';
+import { getConfiguredOrDetectedDraftDir, importDraft, isVersionSupported } from '../../electron/ipc/jianyingDir';
 
 const { execFileMock } = vi.hoisted(() => ({
   execFileMock: vi.fn((_file, _args, callback) => callback(null, '', '')),
@@ -82,5 +82,21 @@ describe('importDraft', () => {
         expect(arg).not.toContain(result.draftDir);
       }
     }
+  });
+});
+
+describe('getConfiguredOrDetectedDraftDir', () => {
+  it('uses a configured Jianying draft directory before auto detection', async () => {
+    const configuredDir = join(os.tmpdir(), 'configured-jianying-drafts');
+    const detectDraftDir = vi.fn(() => {
+      throw new Error('auto detection should not be used');
+    });
+
+    await expect(getConfiguredOrDetectedDraftDir(
+      async () => ({ jianyingDraftDir: `  ${configuredDir}  ` }),
+      detectDraftDir,
+    )).resolves.toBe(configuredDir);
+
+    expect(detectDraftDir).not.toHaveBeenCalled();
   });
 });

@@ -24,6 +24,8 @@ const api: VectCutApi = {
   selectImageFile: () => ipcRenderer.invoke('dialog:selectImageFile') as Promise<string | null>,
   selectSrtFile: () => ipcRenderer.invoke('dialog:selectSrtFile') as Promise<string | null>,
   selectTemplateFolder: () => ipcRenderer.invoke('dialog:selectTemplateFolder') as Promise<string | null>,
+  selectJianyingDraftDir: () =>
+    ipcRenderer.invoke('dialog:selectJianyingDraftDir') as Promise<string | null>,
   selectDraftSavePath: (suggestedName: string) =>
     ipcRenderer.invoke('dialog:selectDraftSavePath', suggestedName) as Promise<string | null>,
 

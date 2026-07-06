@@ -18,6 +18,7 @@ vi.mock('electron', () => ({
 import {
   readZipFile,
   registerDialogHandlers,
+  selectJianyingDraftDir,
   selectDraftSavePath,
   writeZipFile,
 } from '../../electron/ipc/dialog';
@@ -48,13 +49,14 @@ describe('registerDialogHandlers', () => {
 
     registerDialogHandlers(ipcMain as never);
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(8);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(9);
     expect(ipcMain.handle.mock.calls.map(([channel]) => channel)).toEqual([
       'dialog:selectVideoFile',
       'dialog:selectAudioFile',
       'dialog:selectImageFile',
       'dialog:selectSrtFile',
       'dialog:selectTemplateFolder',
+      'dialog:selectJianyingDraftDir',
       'dialog:selectDraftSavePath',
       'file:readZip',
       'file:writeZip',
@@ -109,6 +111,26 @@ describe('registerDialogHandlers', () => {
     registerDialogHandlers(ipcMain as never);
 
     await expect(handlers.get('dialog:selectTemplateFolder')?.()).resolves.toBeNull();
+  });
+
+  it('opens the Jianying draft root dialog with a clear title', async () => {
+    const { ipcMain, handlers } = createFakeIpcMain();
+    const selectedPath = join(os.tmpdir(), 'jianying-draft-root');
+    showOpenDialogMock.mockResolvedValue({ canceled: false, filePaths: [selectedPath] });
+    registerDialogHandlers(ipcMain as never);
+
+    await expect(handlers.get('dialog:selectJianyingDraftDir')?.()).resolves.toBe(selectedPath);
+
+    expect(showOpenDialogMock).toHaveBeenCalledWith({
+      title: '选择剪映草稿根目录',
+      properties: ['openDirectory'],
+    });
+  });
+
+  it('returns null when the Jianying draft root dialog is canceled', async () => {
+    showOpenDialogMock.mockResolvedValue({ canceled: true, filePaths: [] });
+
+    await expect(selectJianyingDraftDir()).resolves.toBeNull();
   });
 
   it('opens the draft save dialog with a sanitized zip filename and authorizes the selected path', async () => {

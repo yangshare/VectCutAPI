@@ -44,6 +44,11 @@ describe('preload controlled IPC API', () => {
       expectedInvokeArgs: ['dialog:selectTemplateFolder'],
     },
     {
+      method: 'selectJianyingDraftDir',
+      args: [],
+      expectedInvokeArgs: ['dialog:selectJianyingDraftDir'],
+    },
+    {
       method: 'selectDraftSavePath',
       args: ['draft-name'],
       expectedInvokeArgs: ['dialog:selectDraftSavePath', 'draft-name'],
@@ -118,6 +123,7 @@ describe('preload controlled IPC API', () => {
       'readZipFile',
       'selectAudioFile',
       'selectImageFile',
+      'selectJianyingDraftDir',
       'selectSrtFile',
       'selectTemplateFolder',
       'selectVideoFile',

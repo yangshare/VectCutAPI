@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { downloadDraft, renderDraft } from '../api/client';
-import { formatUserFacingError } from '../api/errorMessages';
+import { formatUserFacingError, type ApiError } from '../api/errorMessages';
+import ErrorDialog from '../components/ErrorDialog';
 import type { MaterialMetadata } from '../types';
 
 interface GenerateImportProps {
@@ -28,16 +29,42 @@ function stateText(state: FlowState): string {
   }
 }
 
+export function toApiError(error: unknown): ApiError | null {
+  if (
+    error
+    && typeof error === 'object'
+    && 'code' in error
+    && typeof (error as { code: unknown }).code === 'string'
+    && 'message' in error
+    && typeof (error as { message: unknown }).message === 'string'
+  ) {
+    const candidate = error as { code: string; message: string; details?: unknown };
+    return {
+      code: candidate.code,
+      message: candidate.message,
+      ...(isRecord(candidate.details) ? { details: candidate.details } : {}),
+    };
+  }
+
+  return null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
 export default function GenerateImport({ templateId, materials, onRestart }: GenerateImportProps) {
   const [flowState, setFlowState] = useState<FlowState>('idle');
   const [taskId, setTaskId] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
   const [draftDir, setDraftDir] = useState('');
   const [message, setMessage] = useState('');
+  const [dialogError, setDialogError] = useState<ApiError | null>(null);
 
   async function handleStart() {
     setFlowState('rendering');
     setMessage('');
+    setDialogError(null);
     setDraftDir('');
     setWarnings([]);
 
@@ -61,6 +88,10 @@ export default function GenerateImport({ templateId, materials, onRestart }: Gen
       setDraftDir(imported.draftDir);
       setFlowState('done');
     } catch (caught) {
+      const apiError = toApiError(caught);
+      if (apiError) {
+        setDialogError(apiError);
+      }
       setMessage(formatUserFacingError(caught));
       setFlowState('error');
     }
@@ -131,6 +162,10 @@ export default function GenerateImport({ templateId, materials, onRestart }: Gen
           </button>
         ) : null}
       </div>
+
+      {dialogError ? (
+        <ErrorDialog error={dialogError} onClose={() => setDialogError(null)} />
+      ) : null}
     </section>
   );
 }

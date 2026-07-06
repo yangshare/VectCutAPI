@@ -62,6 +62,7 @@ export interface VectCutApi {
   selectImageFile: () => Promise<string | null>;
   selectSrtFile: () => Promise<string | null>;
   selectTemplateFolder: () => Promise<string | null>;
+  selectJianyingDraftDir: () => Promise<string | null>;
   selectDraftSavePath: (suggestedName: string) => Promise<string | null>;
   probeMedia: (filePath: string) => Promise<ProbeResult>;
   detectJianyingDraftDir: () => Promise<string | null>;

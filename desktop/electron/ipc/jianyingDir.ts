@@ -5,6 +5,8 @@ import { mkdir, stat } from 'fs/promises';
 import os from 'os';
 import { basename, extname, join } from 'path';
 import { promisify } from 'util';
+import { getUserConfig } from './configStore';
+import type { UserConfig } from '../../src/types';
 
 const execFileAsync = promisify(execFile);
 
@@ -67,6 +69,22 @@ export async function importDraft(zipPath: string, draftDir: string): Promise<{ 
   return { draftDir: targetDir };
 }
 
+type ConfigReader = () => Promise<UserConfig>;
+type DraftDirDetector = () => string | null;
+
+export async function getConfiguredOrDetectedDraftDir(
+  readConfig: ConfigReader = getUserConfig,
+  detector: DraftDirDetector = detectDraftDir,
+): Promise<string | null> {
+  const config = await readConfig();
+  const configuredDir = config.jianyingDraftDir?.trim();
+  if (configuredDir) {
+    return configuredDir;
+  }
+
+  return detector();
+}
+
 async function createUniqueDraftDir(draftDir: string, baseName: string): Promise<string> {
   for (let index = 0; ; index++) {
     const candidate = join(draftDir, index === 0 ? baseName : `${baseName}_${index}`);
@@ -85,8 +103,8 @@ async function createUniqueDraftDir(draftDir: string, baseName: string): Promise
 export function registerJianyingHandlers(ipcMain: IpcMain): void {
   ipcMain.handle('jianying:detectDraftDir', () => detectDraftDir());
   ipcMain.handle('jianying:detectVersion', () => detectVersion());
-  ipcMain.handle('jianying:importDraft', (_event, zipPath: string) => {
-    const draftDir = detectDraftDir();
+  ipcMain.handle('jianying:importDraft', async (_event, zipPath: string) => {
+    const draftDir = await getConfiguredOrDetectedDraftDir();
     if (!draftDir) {
       throw new Error('未找到剪映草稿目录，请在设置中手动指定');
     }

@@ -15,6 +15,7 @@ describe('App', () => {
     expect(html).toContain('模板 ID');
     expect(html).toContain('选择剪映草稿文件夹');
     expect(html).toContain('导入并解析槽位');
+    expect(html).toContain('设置');
     expect(html).not.toContain('脚手架就绪');
   });
 

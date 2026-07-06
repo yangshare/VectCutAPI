@@ -72,6 +72,15 @@ export async function selectDraftSavePath(suggestedName: string): Promise<string
   return result.filePath;
 }
 
+export async function selectJianyingDraftDir(): Promise<string | null> {
+  const result = await dialog.showOpenDialog({
+    title: '选择剪映草稿根目录',
+    properties: ['openDirectory'],
+  });
+
+  return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0];
+}
+
 export async function writeZipFile(
   savePath: string,
   data: ArrayBuffer | Uint8Array,
@@ -136,6 +145,7 @@ export function registerDialogHandlers(ipcMain: IpcMain): void {
 
     return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0];
   });
+  ipcMain.handle('dialog:selectJianyingDraftDir', () => selectJianyingDraftDir());
   ipcMain.handle('dialog:selectDraftSavePath', (_event, suggestedName: string) =>
     selectDraftSavePath(suggestedName));
   ipcMain.handle('file:readZip', (_event, filePath: string) => readZipFile(filePath));
