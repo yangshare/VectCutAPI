@@ -44,6 +44,17 @@ const api: VectCutApi = {
   // 母版打包（packer.ts）
   packTemplateFolder: (folderPath: string) =>
     ipcRenderer.invoke('packer:pack', folderPath) as Promise<{ zipPath: string; sizeMB: number }>,
+  readDraftContentFile: async (folderPath: string) => {
+    const result = await ipcRenderer.invoke('packer:readDraftContent', folderPath) as {
+      filePath: string;
+      bytes: ArrayBuffer | Uint8Array;
+      sizeMB: number;
+    };
+    return {
+      ...result,
+      bytes: toArrayBuffer(result.bytes),
+    };
+  },
 
   // 主进程 handler 负责 zip 扩展名、大小和路径来源校验。
   readZipFile: async (filePath: string) =>

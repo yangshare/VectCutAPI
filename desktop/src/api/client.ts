@@ -245,6 +245,26 @@ export async function importTemplate(
   });
 }
 
+/** 导入母版 draft_content.json，返回解析出的槽位列表。 */
+export async function importDraftContentTemplate(
+  templateId: string,
+  templateFolderPath: string,
+): Promise<ImportTemplateResult> {
+  const draftContent = await window.vectcut.readDraftContentFile(templateFolderPath);
+  const formData = new FormData();
+  formData.append(
+    'file',
+    new Blob([draftContent.bytes], { type: 'application/json' }),
+    'draft_content.json',
+  );
+
+  return requestEnvelope<ImportTemplateResult>({
+    method: 'post',
+    url: `/api/template/import-draft-content?template_id=${encodeURIComponent(templateId)}`,
+    data: formData,
+  });
+}
+
 /** 保存模板槽位配置。 */
 export async function saveSlotConfig(
   templateId: string,
@@ -261,6 +281,7 @@ export async function saveSlotConfig(
         type: slot.type,
         track_name: slot.track_name,
         segment_index: slot.segment_index,
+        ...(slot.locator ? { locator: slot.locator } : {}),
         required: true,
       })),
     },

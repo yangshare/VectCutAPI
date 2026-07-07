@@ -1,7 +1,8 @@
 """template_filling FastAPI 路由层。
 
 4 个端点（统一 /api/template 前缀）：
-  POST /api/template/import            导入母版 ZIP
+  POST /api/template/import            导入母版 ZIP（legacy）
+  POST /api/template/import-draft-content 导入单个 draft_content.json
   POST /api/template/slot-config       保存槽位配置
   POST /api/template/render            渲染草稿
   GET  /api/template/download/{draft_id}  下载草稿 ZIP
@@ -106,6 +107,57 @@ async def import_template(
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
+
+
+@router.post("/import-draft-content")
+async def import_draft_content(
+    request: Request,
+    template_id: str,
+    file: UploadFile = File(...),
+):
+    """导入单个 draft_content.json。template_id 为 query 参数。"""
+    if not file.filename or file.filename.lower() != "draft_content.json":
+        return envelope_err(make_error("T_INVALID_DRAFT_CONTENT"))
+
+    cfg = load_config()
+    max_mb = int(getattr(cfg, "max_draft_content_mb", 20))
+    max_bytes = max_mb * 1024 * 1024
+    content_length = _get_content_length(request)
+    content_length_limit = max_bytes + _MULTIPART_OVERHEAD_BYTES
+    if content_length is not None and content_length > content_length_limit:
+        return envelope_err(
+            make_error(
+                "T_DRAFT_CONTENT_TOO_LARGE",
+                details={
+                    "content_length": content_length,
+                    "max_bytes": max_bytes,
+                    "max_content_length": content_length_limit,
+                    "max_draft_content_mb": max_mb,
+                },
+            )
+        )
+
+    try:
+        chunks: list[bytes] = []
+        bytes_read = 0
+        while True:
+            chunk = await file.read(_UPLOAD_CHUNK_SIZE)
+            if not chunk:
+                break
+            bytes_read += len(chunk)
+            if bytes_read > max_bytes:
+                return envelope_err(
+                    make_error(
+                        "T_DRAFT_CONTENT_TOO_LARGE",
+                        details={"max_draft_content_mb": max_mb},
+                    )
+                )
+            chunks.append(chunk)
+
+        resp = service.import_draft_content(template_id, b"".join(chunks))
+        return envelope_ok(resp.model_dump())
+    except VectCutError as e:
+        return envelope_err(e)
 
 
 @router.post("/slot-config")

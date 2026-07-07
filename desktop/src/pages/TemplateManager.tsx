@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { importTemplate } from '../api/client';
+import { importDraftContentTemplate } from '../api/client';
 import { formatUserFacingError } from '../api/errorMessages';
 import type { Slot } from '../types';
 
@@ -35,8 +35,7 @@ export default function TemplateManager({ onTemplateImported }: TemplateManagerP
     setIsLoading(true);
     setError('');
     try {
-      const packed = await window.vectcut.packTemplateFolder(folderPath);
-      const result = await importTemplate(normalizedId, packed.zipPath);
+      const result = await importDraftContentTemplate(normalizedId, folderPath);
       onTemplateImported(result.template_id, result.slots);
     } catch (caught) {
       setError(formatUserFacingError(caught));
@@ -52,7 +51,7 @@ export default function TemplateManager({ onTemplateImported }: TemplateManagerP
           导入母版
         </h2>
         <p style={{ margin: 0, color: '#475569' }}>
-          选择一个剪映草稿文件夹并设置模板 ID，客户端会打包后提交到服务端解析可替换槽位。
+          选择一个剪映草稿文件夹并设置模板 ID，客户端只读取 draft_content.json 并提交到服务端解析可替换槽位。
         </p>
       </div>
 

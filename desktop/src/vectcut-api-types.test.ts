@@ -17,6 +17,12 @@ test('window.vectcut exposes controlled IPC methods to the renderer', () => {
   }>();
   expectTypeOf<Window['vectcut']['setUserConfig']>().returns.resolves.toEqualTypeOf<UserConfig>();
   expectTypeOf<Window['vectcut']['readZipFile']>().returns.resolves.toEqualTypeOf<ArrayBuffer>();
+  expectTypeOf<Window['vectcut']['readDraftContentFile']>().parameter(0).toEqualTypeOf<string>();
+  expectTypeOf<Window['vectcut']['readDraftContentFile']>().returns.resolves.toEqualTypeOf<{
+    filePath: string;
+    bytes: ArrayBuffer;
+    sizeMB: number;
+  }>();
   expectTypeOf<Window['vectcut']['selectDraftSavePath']>().parameter(0).toEqualTypeOf<string>();
   expectTypeOf<Window['vectcut']['selectDraftSavePath']>().returns.resolves.toEqualTypeOf<string | null>();
   expectTypeOf<Window['vectcut']['selectJianyingDraftDir']>().returns.resolves.toEqualTypeOf<string | null>();

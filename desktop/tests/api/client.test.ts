@@ -12,6 +12,7 @@ vi.mock('axios', () => ({
 }));
 
 const zipBytes = new Uint8Array([1, 2, 3, 4]).buffer;
+const draftContentBytes = new TextEncoder().encode('{"tracks":[]}').buffer;
 
 function installVectcutApi(configOrServerUrl?: Partial<UserConfig> | string) {
   const config = typeof configOrServerUrl === 'string'
@@ -20,6 +21,11 @@ function installVectcutApi(configOrServerUrl?: Partial<UserConfig> | string) {
   vi.stubGlobal('window', {
     vectcut: {
       readZipFile: vi.fn().mockResolvedValue(zipBytes),
+      readDraftContentFile: vi.fn().mockResolvedValue({
+        filePath: 'D:\\drafts\\template\\draft_content.json',
+        bytes: draftContentBytes,
+        sizeMB: 0.001,
+      }),
       writeZipFile: vi.fn().mockResolvedValue(undefined),
       selectDraftSavePath: vi.fn().mockResolvedValue('D:\\downloads\\draft.zip'),
       getUserConfig: vi.fn().mockResolvedValue(config),
@@ -65,6 +71,39 @@ describe('api client', () => {
     const file = Array.from((request.data as FormData).entries())
       .find(([name]) => name === 'file')?.[1] as File;
     expect(file.name).toBe('tpl 1.zip');
+  });
+
+  it('imports a draft_content template without reading or uploading a zip', async () => {
+    const { importDraftContentTemplate } = await import('../../src/api/client');
+    const slots = [
+      {
+        slot_id: 'video_track0_seg0',
+        type: 'video',
+        track_name: '',
+        segment_index: 0,
+        locator: { scope: 'root', track_index: 0, track_type: 'video', segment_index: 0 },
+      },
+    ];
+    axiosRequest.mockResolvedValueOnce({
+      data: {
+        success: true,
+        output: { template_id: 'tpl-1', slots, message: 'imported' },
+        error: null,
+      },
+    });
+
+    const result = await importDraftContentTemplate('tpl 1', 'D:\\drafts\\template');
+
+    expect(result).toEqual({ template_id: 'tpl-1', slots, message: 'imported' });
+    expect(window.vectcut.readDraftContentFile).toHaveBeenCalledWith('D:\\drafts\\template');
+    expect(window.vectcut.readZipFile).not.toHaveBeenCalled();
+    const request = axiosRequest.mock.calls[0][0] as AxiosRequestConfig;
+    expect(request.method).toBe('post');
+    expect(request.url).toBe('/api/template/import-draft-content?template_id=tpl%201');
+    expect(request.data).toBeInstanceOf(FormData);
+    const file = Array.from((request.data as FormData).entries())
+      .find(([name]) => name === 'file')?.[1] as File;
+    expect(file.name).toBe('draft_content.json');
   });
 
   it('throws backend ApiError objects for failed import envelopes', async () => {
@@ -476,6 +515,10 @@ describe('error message mapping', () => {
 
     expect(getUserFriendlyError({ code: 'T_INVALID_ZIP', message: 'invalid zip' }))
       .toBe('母版 ZIP 文件格式无效，请检查是否为完整的剪映草稿文件夹');
+    expect(getUserFriendlyError({ code: 'T_ENCRYPTED_DRAFT_UNSUPPORTED', message: 'encrypted' }))
+      .toBe('服务端未配置剪映解密能力，请联系部署人员配置 videoeditor.dll');
+    expect(getUserFriendlyError({ code: 'R_INVALID_MATERIAL_METADATA', message: 'bad metadata' }))
+      .toBe('素材路径或元数据无效，请重新选择素材');
   });
 
   it('appends details when provided', async () => {

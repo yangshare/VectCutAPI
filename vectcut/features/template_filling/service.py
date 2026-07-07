@@ -6,9 +6,9 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
-import shutil
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -19,6 +19,7 @@ from vectcut.core.config import load_config
 from vectcut.core.errors import SlotError, TemplateError, make_error
 from vectcut.core.logger import sanitize_exception
 from vectcut.features.template_filling import (
+    draft_content_decryptor,
     duration_calculator,
     material_builder,
     slot_resolver,
@@ -86,6 +87,38 @@ def _template_import_semantic_error(template_id: str, exc: Exception) -> Templat
     )
 
 
+def _draft_content_import_semantic_error(template_id: str, exc: Exception) -> TemplateError:
+    return make_error(
+        "T_INVALID_DRAFT_CONTENT",
+        "draft_content.json 内容无法解析",
+        details={
+            "template_id": template_id,
+            "reason": sanitize_exception(exc),
+        },
+    )
+
+
+def _parse_plain_draft_content(content: bytes) -> bytes:
+    try:
+        text = content.decode("utf-8-sig")
+        json.loads(text)
+    except Exception as exc:
+        raise make_error(
+            "T_INVALID_DRAFT_CONTENT",
+            "draft_content.json 不是合法 JSON",
+            details={"reason": sanitize_exception(exc)},
+        ) from exc
+    return text.encode("utf-8")
+
+
+def _load_draft_content_bytes(content: bytes, *, dll_path: str) -> tuple[bytes, bool]:
+    try:
+        return _parse_plain_draft_content(content), False
+    except TemplateError:
+        plain = draft_content_decryptor.decrypt_draft_content(content, dll_path)
+        return _parse_plain_draft_content(plain), True
+
+
 def _scan_slots_from_template(script) -> List[Dict[str, Any]]:
     """从 script.tracks / script.imported_tracks 扫描可替换槽位。
 
@@ -102,16 +135,25 @@ def _scan_slots_from_template(script) -> List[Dict[str, Any]]:
     seen_track_keys = set()
     candidate_tracks = list(_iter_tracks(getattr(script, "tracks", None)))
     candidate_tracks.extend(_iter_tracks(getattr(script, "imported_tracks", None)))
+    unique_tracks = []
 
     for track in candidate_tracks:
         # 用 .name 字符串比较，兼容真实 Track_type 枚举与测试 mock
         tt_name = getattr(track.track_type, "name", str(track.track_type))
-        track_name = track.name
+        track_name = getattr(track, "name", "")
         track_key = (tt_name, track_name)
-        if id(track) in seen_object_ids or track_key in seen_track_keys:
+        if id(track) in seen_object_ids:
+            continue
+        if track_name and track_key in seen_track_keys:
             continue
         seen_object_ids.add(id(track))
-        seen_track_keys.add(track_key)
+        if track_name:
+            seen_track_keys.add(track_key)
+        unique_tracks.append(track)
+
+    for track_index, track in enumerate(unique_tracks):
+        tt_name = getattr(track.track_type, "name", str(track.track_type))
+        track_name = getattr(track, "name", "")
 
         if tt_name == "video":
             slot_type = "video"
@@ -123,12 +165,23 @@ def _scan_slots_from_template(script) -> List[Dict[str, Any]]:
             continue  # 跳过 sticker / effect 等非替换轨道
 
         for seg_idx in range(len(track.segments)):
+            slot_id = (
+                f"{slot_type}_{track_name}_{seg_idx}"
+                if track_name
+                else f"{slot_type}_track{track_index}_seg{seg_idx}"
+            )
             slots.append({
-                "slot_id": f"{slot_type}_{track_name}_{seg_idx}",
+                "slot_id": slot_id,
                 "type": slot_type,
                 "track_name": track_name,
                 "segment_index": seg_idx,
                 "name": f"{slot_type}槽位{seg_idx}",
+                "locator": {
+                    "scope": "root",
+                    "track_index": track_index,
+                    "track_type": tt_name,
+                    "segment_index": seg_idx,
+                },
             })
     return slots
 
@@ -382,14 +435,60 @@ def _validate_render_slot_config(script, slot: Dict[str, Any], template_id: str)
 
 
 def _copy_template_resources_to_output(draft_content_path: str, output_dir: str) -> None:
-    template_dir = Path(draft_content_path).parent
     target_dir = Path(output_dir)
-    if template_dir.resolve() == target_dir.resolve():
-        return
-    shutil.copytree(template_dir, target_dir, dirs_exist_ok=True)
+    target_dir.mkdir(parents=True, exist_ok=True)
 
 
 # ─── 4 个核心函数 ──────────────────────────────────────────────────────────
+
+
+def import_draft_content(template_id: str, content: bytes) -> ImportTemplateResponse:
+    """导入单个 draft_content.json bytes，不上传母版 ZIP。"""
+    _validate_template_id(template_id)
+
+    cfg = load_config()
+    max_bytes = int(getattr(cfg, "max_draft_content_mb", 20)) * 1024 * 1024
+    if len(content) > max_bytes:
+        raise make_error(
+            "T_DRAFT_CONTENT_TOO_LARGE",
+            details={
+                "content_length": len(content),
+                "max_bytes": max_bytes,
+                "max_draft_content_mb": getattr(cfg, "max_draft_content_mb", 20),
+            },
+        )
+
+    plain_content, encrypted_input = _load_draft_content_bytes(
+        content,
+        dll_path=getattr(cfg, "jianying_decrypt_dll_path", ""),
+    )
+    stage = storage.stage_template_draft_content(
+        template_id,
+        plain_content,
+        encrypted_input=encrypted_input,
+    )
+    committed = False
+    try:
+        with storage.template_lock(template_id):
+            draft_content_path = storage.require_template_draft_content_path_from_dir(
+                template_id, stage.extract_dir
+            )
+            try:
+                script = draft.Script_file.load_template(draft_content_path)
+                slots = _scan_slots_from_template(script)
+            except Exception as exc:
+                raise _draft_content_import_semantic_error(template_id, exc) from exc
+            storage.commit_staged_draft_content(stage)
+            committed = True
+    finally:
+        if not committed:
+            storage.cleanup_staged_draft_content(stage)
+
+    return ImportTemplateResponse(
+        template_id=template_id,
+        slots=slots,
+        message=f"模板 {template_id} 导入成功，共 {len(slots)} 个槽位",
+    )
 
 
 def import_template(template_id: str, uploaded_zip_path: str) -> ImportTemplateResponse:

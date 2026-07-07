@@ -12,11 +12,13 @@ from pyJianYingDraft.local_materials import Audio_material, Video_material
 
 from vectcut.core.errors import make_error
 
+_INVALID_METADATA_CODE = "R_INVALID_MATERIAL_METADATA"
+
 
 def _require_metadata_dict(metadata: Any, *, material_type: str) -> dict:
     if not isinstance(metadata, dict):
         raise make_error(
-            "R_INVALID_PATH",
+            _INVALID_METADATA_CODE,
             "素材元数据必须是对象",
             details={
                 "material_type": material_type,
@@ -31,7 +33,7 @@ def _require_path(metadata: dict, *, material_type: str) -> str:
     path = metadata.get("path")
     if not isinstance(path, str) or not path.strip():
         raise make_error(
-            "R_INVALID_PATH",
+            _INVALID_METADATA_CODE,
             "素材路径缺失或非法",
             details={"material_type": material_type, "field": "path"},
         )
@@ -43,7 +45,6 @@ def _require_positive_number(
     field: str,
     *,
     material_type: str,
-    error_code: str,
 ) -> float:
     value: Any = metadata.get(field)
     if isinstance(value, bool):
@@ -54,7 +55,7 @@ def _require_positive_number(
         numeric = 0.0
     if numeric <= 0:
         raise make_error(
-            error_code,
+            _INVALID_METADATA_CODE,
             f"素材字段 {field} 缺失或非法",
             details={"material_type": material_type, "field": field},
         )
@@ -66,11 +67,10 @@ def _require_positive_int(metadata: dict, field: str, *, material_type: str) -> 
         metadata,
         field,
         material_type=material_type,
-        error_code="R_INVALID_PATH",
     )
     if not numeric.is_integer():
         raise make_error(
-            "R_INVALID_PATH",
+            _INVALID_METADATA_CODE,
             f"素材字段 {field} 缺失或非法",
             details={"material_type": material_type, "field": field},
         )
@@ -96,7 +96,6 @@ def build_video_material_from_metadata(metadata: dict) -> Video_material:
         metadata,
         "duration",
         material_type="video",
-        error_code="R_INVALID_DURATION",
     )
     width = _require_positive_int(metadata, "width", material_type="video")
     height = _require_positive_int(metadata, "height", material_type="video")
@@ -131,7 +130,6 @@ def build_audio_material_from_metadata(metadata: dict) -> Audio_material:
         metadata,
         "duration",
         material_type="audio",
-        error_code="R_INVALID_DURATION",
     )
 
     mat = Audio_material(

@@ -35,6 +35,73 @@ def _map_slot_type_to_track_type(slot_type: str) -> Track_type:
     return mapping[slot_type]
 
 
+def _iter_tracks(value):
+    if value is None:
+        return []
+    if isinstance(value, dict):
+        return value.values()
+    return value
+
+
+def _unique_script_tracks(script) -> list:
+    tracks = []
+    seen_object_ids = set()
+    seen_track_keys = set()
+    candidates = list(_iter_tracks(getattr(script, "tracks", None)))
+    candidates.extend(_iter_tracks(getattr(script, "imported_tracks", None)))
+    for track in candidates:
+        track_name = getattr(track, "name", "")
+        track_type = getattr(getattr(track, "track_type", None), "name", "")
+        track_key = (track_type, track_name)
+        if id(track) in seen_object_ids:
+            continue
+        if track_name and track_key in seen_track_keys:
+            continue
+        seen_object_ids.add(id(track))
+        if track_name:
+            seen_track_keys.add(track_key)
+        tracks.append(track)
+    return tracks
+
+
+def _resolve_slot_by_locator(script, slot: dict):
+    locator = slot.get("locator")
+    if not isinstance(locator, dict):
+        return None
+    track_index = locator.get("track_index")
+    if isinstance(track_index, bool) or not isinstance(track_index, int):
+        raise make_error(
+            "S_INVALID_LOCATOR",
+            "槽位 locator.track_index 必须是整数",
+            details={"slot_id": slot.get("slot_id"), "locator": locator},
+        )
+    tracks = _unique_script_tracks(script)
+    if track_index < 0 or track_index >= len(tracks):
+        raise make_error(
+            "S_INVALID_LOCATOR",
+            "槽位 locator.track_index 越界",
+            details={
+                "slot_id": slot.get("slot_id"),
+                "track_index": track_index,
+                "track_count": len(tracks),
+            },
+        )
+    track = tracks[track_index]
+    expected_type = locator.get("track_type")
+    actual_type = getattr(getattr(track, "track_type", None), "name", "")
+    if expected_type and actual_type and expected_type != actual_type:
+        raise make_error(
+            "S_INVALID_LOCATOR",
+            "槽位 locator.track_type 与母版轨道不匹配",
+            details={
+                "slot_id": slot.get("slot_id"),
+                "expected_track_type": expected_type,
+                "actual_track_type": actual_type,
+            },
+        )
+    return track
+
+
 def resolve_slot_to_track(script, slot: dict):
     """把 slot（含 type/track_name）映射到 script 的轨道对象。
 
@@ -57,6 +124,9 @@ def resolve_slot_to_track(script, slot: dict):
             f"槽位缺少 type 字段: {slot}",
             details={"slot": slot},
         )
+    locator_track = _resolve_slot_by_locator(script, slot)
+    if locator_track is not None:
+        return locator_track
     if not track_name:
         raise make_error(
             "S_INVALID_SLOT",
@@ -106,13 +176,18 @@ def validate_slot_segment_index(track, segment_index: int, slot_id: str) -> None
 def parse_slot_segment_index(slot: dict) -> int:
     slot_id = slot.get("slot_id", "")
     if "segment_index" not in slot:
-        raise make_error(
-            "S_INVALID_SLOT",
-            "槽位配置缺少 segment_index",
-            details={"slot_id": slot_id, "slot": slot},
-        )
+        locator = slot.get("locator")
+        if isinstance(locator, dict) and "segment_index" in locator:
+            value = locator.get("segment_index")
+        else:
+            raise make_error(
+                "S_INVALID_SLOT",
+                "槽位配置缺少 segment_index",
+                details={"slot_id": slot_id, "slot": slot},
+            )
+    else:
+        value = slot.get("segment_index")
 
-    value = slot.get("segment_index")
     if isinstance(value, bool) or value is None:
         raise make_error(
             "S_INVALID_SLOT",

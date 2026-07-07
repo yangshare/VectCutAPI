@@ -116,10 +116,10 @@ def test_full_workflow(temp_storage_dirs, mock_load_template, sample_template_zi
     assert download_resp.message
 
 
-def test_render_draft_preserves_template_resource_files(
+def test_render_draft_does_not_copy_template_resource_files(
     temp_storage_dirs, mock_load_template, sample_template_zip
 ):
-    """生成草稿 ZIP 时应保留母版目录资源，不能只输出 draft_content.json。"""
+    """生成草稿 ZIP 不复制母版附件，素材由新路径引用。"""
     with zipfile.ZipFile(sample_template_zip, "a", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("Resources/cover.png", b"fake image")
         zf.writestr("Resources/audio/bgm.mp3", b"fake audio")
@@ -162,8 +162,8 @@ def test_render_draft_preserves_template_resource_files(
     with zipfile.ZipFile(generated_zip) as zf:
         names = set(zf.namelist())
         assert "draft_content.json" in names
-        assert "Resources/cover.png" in names
-        assert "Resources/audio/bgm.mp3" in names
+        assert "Resources/cover.png" not in names
+        assert "Resources/audio/bgm.mp3" not in names
 
 
 def test_full_workflow_subtitle_import_and_cover_skip(

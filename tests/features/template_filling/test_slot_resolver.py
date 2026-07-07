@@ -29,6 +29,7 @@ class _MockScript:
             "audio_bgm": _MockTrack("audio_bgm", 3),
             "text_subtitle": _MockTrack("text_subtitle", 1),
         }
+        self.tracks = list(self._tracks.values())
 
     def get_imported_track(self, track_type, name=None):
         if name in self._tracks:
@@ -86,6 +87,20 @@ class TestResolveSlotToTrack:
         with pytest.raises(SlotError, match="缺少 track_name") as exc:
             resolve_slot_to_track(script, slot)
         assert exc.value.code == "S_INVALID_SLOT"
+
+    def test_resolves_locator_track_index_without_track_name(self, script):
+        slot = {
+            "type": "video",
+            "track_name": "",
+            "locator": {
+                "scope": "root",
+                "track_index": 0,
+                "track_type": "video",
+                "segment_index": 1,
+            },
+        }
+        track = resolve_slot_to_track(script, slot)
+        assert track.name == "video_main"
 
 
 class TestValidateSlotSegmentIndex:

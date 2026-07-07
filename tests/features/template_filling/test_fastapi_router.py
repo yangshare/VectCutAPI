@@ -191,6 +191,77 @@ def test_import_endpoint_missing_template_id_validation_returns_structured_error
     assert data["error"]["details"]["errors"]
 
 
+# ─── POST /api/template/import-draft-content ────────────────────────────────
+
+
+def test_import_draft_content_endpoint_success(monkeypatch):
+    """成功路径：上传 draft_content.json bytes，不走 ZIP。"""
+    captured: dict[str, object] = {}
+    fake_resp = ImportTemplateResponse(
+        template_id="t1",
+        slots=[{"slot_id": "video_track0_seg0", "type": "video"}],
+        message="ok",
+    )
+
+    def _import(template_id, content):
+        captured["template_id"] = template_id
+        captured["content"] = content
+        return fake_resp
+
+    monkeypatch.setattr(service, "import_draft_content", _import)
+    monkeypatch.setattr(
+        router,
+        "load_config",
+        lambda: SimpleNamespace(max_draft_content_mb=20),
+        raising=False,
+    )
+
+    resp = client.post(
+        "/api/template/import-draft-content?template_id=t1",
+        files={"file": ("draft_content.json", io.BytesIO(b'{"tracks":[]}'), "application/json")},
+    )
+
+    data = resp.json()
+    assert data["success"] is True
+    assert captured == {"template_id": "t1", "content": b'{"tracks":[]}'}
+    assert data["output"]["slots"][0]["slot_id"] == "video_track0_seg0"
+
+
+def test_import_draft_content_endpoint_rejects_wrong_filename():
+    """新接口只接收 draft_content.json。"""
+    resp = client.post(
+        "/api/template/import-draft-content?template_id=t1",
+        files={"file": ("template.zip", io.BytesIO(b"PK\x03\x04"), "application/zip")},
+    )
+
+    data = resp.json()
+    assert data["success"] is False
+    assert data["error"]["code"] == "T_INVALID_DRAFT_CONTENT"
+
+
+def test_import_draft_content_content_length_middleware_uses_draft_limit(monkeypatch):
+    """新 draft_content 接口应按 max_draft_content_mb 在 multipart 解析前拦截。"""
+    monkeypatch.setattr(
+        http_app_module,
+        "load_config",
+        lambda: SimpleNamespace(max_template_zip_mb=50, max_draft_content_mb=1),
+        raising=False,
+    )
+
+    resp = client.post(
+        "/api/template/import-draft-content?template_id=t1",
+        content=b"not multipart",
+        headers={
+            "content-type": "multipart/form-data; boundary=x",
+            "content-length": str((2 * 1024 * 1024) + 1),
+        },
+    )
+
+    data = resp.json()
+    assert data["success"] is False
+    assert data["error"]["code"] == "T_DRAFT_CONTENT_TOO_LARGE"
+
+
 class _ChunkOnlyUpload:
     """Test double that fails if router reads the entire upload in one call."""
 

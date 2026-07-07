@@ -6,6 +6,17 @@ export interface Slot {
   type: SlotType;
   track_name: string;
   segment_index: number;
+  locator?: SlotLocator;
+}
+
+export interface SlotLocator {
+  scope: 'root';
+  track_index: number;
+  track_id?: string;
+  track_type?: string;
+  segment_index: number;
+  segment_id?: string;
+  material_id?: string;
 }
 
 /** 素材元数据（客户端采集，提交云端） */
@@ -42,6 +53,7 @@ export interface SlotMapping {
   type: Slot['type'];
   track_name: string;
   segment_index: number;
+  locator?: SlotLocator;
 }
 
 /** 后端统一响应信封 */
@@ -80,6 +92,11 @@ export interface VectCutApi {
   detectJianyingVersion: () => Promise<string | null>;
   importDraftToJianying: (zipPath: string) => Promise<{ draftDir: string }>;
   packTemplateFolder: (folderPath: string) => Promise<{ zipPath: string; sizeMB: number }>;
+  readDraftContentFile: (folderPath: string) => Promise<{
+    filePath: string;
+    bytes: ArrayBuffer;
+    sizeMB: number;
+  }>;
   readZipFile: (filePath: string) => Promise<ArrayBuffer>;
   readTextFile: (filePath: string) => Promise<string>;
   writeZipFile: (savePath: string, data: ArrayBuffer) => Promise<void>;

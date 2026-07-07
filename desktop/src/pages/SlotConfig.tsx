@@ -15,6 +15,7 @@ function toMapping(slot: Slot): SlotMapping {
     type: slot.type,
     track_name: slot.track_name,
     segment_index: slot.segment_index,
+    ...(slot.locator ? { locator: slot.locator } : {}),
   };
 }
 
@@ -71,7 +72,7 @@ export default function SlotConfig({ templateId, slots, onConfigSaved }: SlotCon
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 680 }}>
             <thead>
               <tr>
-                {['选择', 'slot_id', 'type', 'track_name', 'segment_index'].map((heading) => (
+                {['选择', 'slot_id', 'type', 'track_name', 'segment_index', 'locator'].map((heading) => (
                   <th key={heading} style={thStyle}>{heading}</th>
                 ))}
               </tr>
@@ -92,6 +93,9 @@ export default function SlotConfig({ templateId, slots, onConfigSaved }: SlotCon
                   <td style={tdStyle}>{slot.type}</td>
                   <td style={tdStyle}>{slot.track_name}</td>
                   <td style={tdStyle}>{slot.segment_index}</td>
+                  <td style={tdStyle}>
+                    {slot.locator ? `track ${slot.locator.track_index}, seg ${slot.locator.segment_index}` : '-'}
+                  </td>
                 </tr>
               ))}
             </tbody>

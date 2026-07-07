@@ -36,6 +36,7 @@ class SlotConfig(BaseModel):
     type: str
     track_name: str
     segment_index: int
+    locator: Optional[Dict[str, Any]] = None
     required: bool = True
 
 

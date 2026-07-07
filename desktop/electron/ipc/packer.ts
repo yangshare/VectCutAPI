@@ -2,12 +2,18 @@ import { execFile } from 'child_process';
 import { randomUUID } from 'crypto';
 import type { IpcMain } from 'electron';
 import { existsSync, statSync } from 'fs';
-import { mkdir, stat } from 'fs/promises';
+import { mkdir, readFile, stat } from 'fs/promises';
 import os from 'os';
 import { basename, join } from 'path';
 
 export interface PackTemplateResult {
   zipPath: string;
+  sizeMB: number;
+}
+
+export interface DraftContentReadResult {
+  filePath: string;
+  bytes: Buffer;
   sizeMB: number;
 }
 
@@ -39,6 +45,25 @@ export function validateTemplateFolder(folderPath: string): void {
   if (!draftContentStats.isFile()) {
     throw new Error(`draft_content.json 不是文件：${draftContentPath}`);
   }
+}
+
+export async function readDraftContentFile(
+  folderPath: string,
+  maxBytes = 20 * 1024 * 1024,
+): Promise<DraftContentReadResult> {
+  validateTemplateFolder(folderPath);
+
+  const draftContentPath = join(folderPath, 'draft_content.json');
+  const draftContentStats = await stat(draftContentPath);
+  if (draftContentStats.size > maxBytes) {
+    throw new Error('draft_content.json 超过大小限制');
+  }
+
+  return {
+    filePath: draftContentPath,
+    bytes: await readFile(draftContentPath),
+    sizeMB: draftContentStats.size / 1024 / 1024,
+  };
 }
 
 function createZipPath(folderPath: string, outputDir: string): string {
@@ -115,4 +140,6 @@ export async function packTemplateFolder(
 
 export function registerPackerHandlers(ipcMain: IpcMain): void {
   ipcMain.handle('packer:pack', (_event, folderPath: string) => packTemplateFolder(folderPath));
+  ipcMain.handle('packer:readDraftContent', (_event, folderPath: string) =>
+    readDraftContentFile(folderPath));
 }

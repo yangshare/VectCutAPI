@@ -37,14 +37,17 @@ def _too_large_payload(
     *,
     max_bytes: int,
     max_content_length: int,
-    max_template_zip_mb: int,
+    max_mb: int,
+    max_mb_field: str,
+    code: str,
+    message: str,
     content_length: int | None = None,
     received_bytes: int | None = None,
 ) -> dict:
     details = {
         "max_bytes": max_bytes,
         "max_content_length": max_content_length,
-        "max_template_zip_mb": max_template_zip_mb,
+        max_mb_field: max_mb,
     }
     if content_length is not None:
         details["content_length"] = content_length
@@ -52,8 +55,8 @@ def _too_large_payload(
         details["received_bytes"] = received_bytes
     return envelope_err(
         {
-            "code": "T_TOO_LARGE",
-            "message": "模板 ZIP 超过大小限制",
+            "code": code,
+            "message": message,
             "details": details,
         }
     )
@@ -67,14 +70,26 @@ class _TemplateImportBodyLimitMiddleware:
         if (
             scope.get("type") != "http"
             or scope.get("method") != "POST"
-            or scope.get("path") != "/api/template/import"
+            or scope.get("path") not in {
+                "/api/template/import",
+                "/api/template/import-draft-content",
+            }
         ):
             await self.app(scope, receive, send)
             return
 
         cfg = load_config()
-        max_bytes = int(cfg.max_template_zip_mb) * 1024 * 1024
+        is_draft_content = scope.get("path") == "/api/template/import-draft-content"
+        max_mb_field = "max_draft_content_mb" if is_draft_content else "max_template_zip_mb"
+        max_mb = int(getattr(cfg, max_mb_field))
+        max_bytes = max_mb * 1024 * 1024
         max_content_length = max_bytes + _MULTIPART_OVERHEAD_BYTES
+        code = "T_DRAFT_CONTENT_TOO_LARGE" if is_draft_content else "T_TOO_LARGE"
+        message = (
+            "draft_content.json 超过大小限制"
+            if is_draft_content
+            else "模板 ZIP 超过大小限制"
+        )
         headers = {
             key.lower(): value
             for key, value in scope.get("headers", [])
@@ -92,7 +107,10 @@ class _TemplateImportBodyLimitMiddleware:
                         content_length=content_length,
                         max_bytes=max_bytes,
                         max_content_length=max_content_length,
-                        max_template_zip_mb=cfg.max_template_zip_mb,
+                        max_mb=max_mb,
+                        max_mb_field=max_mb_field,
+                        code=code,
+                        message=message,
                     ),
                 )
                 await response(scope, receive, send)
@@ -123,7 +141,10 @@ class _TemplateImportBodyLimitMiddleware:
                     received_bytes=received,
                     max_bytes=max_bytes,
                     max_content_length=max_content_length,
-                    max_template_zip_mb=cfg.max_template_zip_mb,
+                    max_mb=max_mb,
+                    max_mb_field=max_mb_field,
+                    code=code,
+                    message=message,
                 ),
             )
             await response(scope, receive, send)

@@ -79,6 +79,11 @@ describe('preload controlled IPC API', () => {
       expectedInvokeArgs: ['packer:pack', 'C:/templates/template-a'],
     },
     {
+      method: 'readDraftContentFile',
+      args: ['C:/templates/template-a'],
+      expectedInvokeArgs: ['packer:readDraftContent', 'C:/templates/template-a'],
+    },
+    {
       method: 'readZipFile',
       args: ['C:/templates/template-a.zip'],
       expectedInvokeArgs: ['file:readZip', 'C:/templates/template-a.zip'],
@@ -125,6 +130,7 @@ describe('preload controlled IPC API', () => {
       'importDraftToJianying',
       'packTemplateFolder',
       'probeMedia',
+      'readDraftContentFile',
       'readTextFile',
       'readZipFile',
       'selectAudioFile',
@@ -141,7 +147,11 @@ describe('preload controlled IPC API', () => {
   });
 
   test.each(ipcCases)('$method routes to the expected IPC channel', async ({ method, args, expectedInvokeArgs }) => {
-    electronMock.invoke.mockResolvedValue(new ArrayBuffer(0));
+    electronMock.invoke.mockResolvedValue(
+      method === 'readDraftContentFile'
+        ? { filePath: 'C:/templates/template-a/draft_content.json', bytes: new ArrayBuffer(0), sizeMB: 0 }
+        : new ArrayBuffer(0),
+    );
     await import('./preload');
     const [, api] = electronMock.exposeInMainWorld.mock.calls[0];
 

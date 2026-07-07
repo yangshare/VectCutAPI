@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildPackCommand,
   packTemplateFolder,
+  readDraftContentFile,
   validateTemplateFolder,
 } from '../../electron/ipc/packer';
 
@@ -55,6 +56,19 @@ describe('packer', () => {
     await writeFile(join(folderPath, 'draft_content.json'), '{}');
 
     expect(() => validateTemplateFolder(folderPath)).not.toThrow();
+  });
+
+  it('reads only root draft_content.json without invoking the zip packer', async () => {
+    const folderPath = join(tempDir, 'template');
+    await mkdir(folderPath);
+    await writeFile(join(folderPath, 'draft_content.json'), '{"tracks":[]}');
+
+    const result = await readDraftContentFile(folderPath);
+
+    expect(result.filePath).toBe(join(folderPath, 'draft_content.json'));
+    expect(result.sizeMB).toBeGreaterThan(0);
+    expect(Buffer.from(result.bytes).toString('utf8')).toBe('{"tracks":[]}');
+    expect(execFileMock).not.toHaveBeenCalled();
   });
 
   it('packs a valid template folder to a non-empty zip file', async () => {

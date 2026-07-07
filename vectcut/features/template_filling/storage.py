@@ -49,6 +49,13 @@ class StagedTemplateZip:
     final_zip_path: Path
 
 
+@dataclass(frozen=True)
+class StagedDraftContent:
+    template_id: str
+    extract_dir: Path
+    final_extract_dir: Path
+
+
 def _ensure_parent(path: str | os.PathLike) -> Path:
     """确保目标文件的父目录存在，返回 Path。"""
     p = Path(path)
@@ -377,6 +384,77 @@ def cleanup_staged_template(stage: StagedTemplateZip) -> None:
         shutil.rmtree(stage.extract_dir)
     if stage.zip_path.exists():
         stage.zip_path.unlink()
+
+
+def stage_template_draft_content(
+    template_id: str,
+    content: bytes,
+    *,
+    encrypted_input: bool = False,
+) -> StagedDraftContent:
+    """把单个明文 draft_content.json 写入 staging 目录。"""
+    cfg = load_config()
+    template_root = Path(cfg.template_folder)
+    template_root.mkdir(parents=True, exist_ok=True)
+    staging_id = uuid.uuid4().hex
+    staging_dir = template_root / f"{template_id}.tmp-{staging_id}"
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    draft_content_path = staging_dir / "draft_content.json"
+    draft_content_path.write_bytes(content)
+    meta = {
+        "template_id": template_id,
+        "source": "draft_content",
+        "encrypted_input": encrypted_input,
+        "draft_content_sha256": hashlib.sha256(content).hexdigest(),
+    }
+    (staging_dir / "template_meta.json").write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return StagedDraftContent(
+        template_id=template_id,
+        extract_dir=staging_dir,
+        final_extract_dir=template_root / template_id,
+    )
+
+
+def commit_staged_draft_content(stage: StagedDraftContent) -> str:
+    """把 draft_content staging 目录切换为正式模板目录。"""
+    backup_id = uuid.uuid4().hex
+    backup_extract_dir = stage.final_extract_dir.with_name(
+        f"{stage.final_extract_dir.name}.bak-{backup_id}"
+    )
+    backed_up_dir = False
+    installed_dir = False
+
+    try:
+        if stage.final_extract_dir.exists():
+            stage.final_extract_dir.replace(backup_extract_dir)
+            backed_up_dir = True
+        stage.extract_dir.replace(stage.final_extract_dir)
+        installed_dir = True
+    except Exception:
+        if (installed_dir or backed_up_dir) and stage.final_extract_dir.exists():
+            shutil.rmtree(stage.final_extract_dir)
+        if backed_up_dir and backup_extract_dir.exists():
+            backup_extract_dir.replace(stage.final_extract_dir)
+        raise
+    else:
+        if backup_extract_dir.exists():
+            try:
+                shutil.rmtree(backup_extract_dir)
+            except Exception as exc:
+                _logger.warning(
+                    "Template backup dir cleanup failed: %s",
+                    sanitize_exception(exc),
+                )
+    return str(stage.final_extract_dir)
+
+
+def cleanup_staged_draft_content(stage: StagedDraftContent) -> None:
+    """清理未提交的 draft_content staging 目录。"""
+    if stage.extract_dir.exists():
+        shutil.rmtree(stage.extract_dir)
 
 
 def extract_template_zip(template_id: str, uploaded_zip_path: str) -> str:

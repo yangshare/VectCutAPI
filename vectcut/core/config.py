@@ -82,6 +82,8 @@ class Settings(BaseModel):
     generated_draft_folder: str = "./data/generated_drafts"
     temp_folder: str = "./data/temp"
     max_template_zip_mb: int = 50
+    max_draft_content_mb: int = 20
+    jianying_decrypt_dll_path: str = ""
     auth: AuthConfig = Field(default_factory=AuthConfig)
     oss_config: OssConfig = Field(default_factory=OssConfig)
     mp4_oss_config: Mp4OssConfig = Field(default_factory=Mp4OssConfig)
@@ -104,6 +106,9 @@ def load_config(path: Optional[os.PathLike] = None) -> Settings:
         raw = load_config_with_env(config_path)
     except Exception:
         return Settings()
-    if isinstance(raw, dict) and raw.get("max_template_zip_mb") == "${MAX_TEMPLATE_ZIP_MB}":
-        raw.pop("max_template_zip_mb")
+    if isinstance(raw, dict):
+        if raw.get("max_template_zip_mb") == "${MAX_TEMPLATE_ZIP_MB}":
+            raw.pop("max_template_zip_mb")
+        if raw.get("max_draft_content_mb") == "${MAX_DRAFT_CONTENT_MB}":
+            raw.pop("max_draft_content_mb")
     return Settings.model_validate(raw)

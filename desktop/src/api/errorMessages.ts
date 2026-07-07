@@ -4,6 +4,10 @@ export const ERROR_MESSAGES: Record<string, string> = {
   T_NOT_FOUND: '模板不存在，请重新导入母版',
   T_INVALID_ZIP: '母版 ZIP 文件格式无效，请检查是否为完整的剪映草稿文件夹',
   T_TOO_LARGE: '母版文件过大（超过 50MB），请精简母版内容',
+  T_DRAFT_CONTENT_TOO_LARGE: 'draft_content.json 超过大小限制',
+  T_INVALID_DRAFT_CONTENT: 'draft_content.json 格式无效，请确认选择的是剪映草稿目录',
+  T_ENCRYPTED_DRAFT_UNSUPPORTED: '服务端未配置剪映解密能力，请联系部署人员配置 videoeditor.dll',
+  T_DECRYPT_FAILED: 'draft_content.json 解密失败，请检查服务端剪映 DLL 配置',
   T_NO_DRAFT_CONTENT: 'ZIP 中缺少 draft_content.json 文件，请确认是否为剪映草稿',
   T_INVALID_ID: '模板 ID 非法',
   // 槽位错误 (S_xxx)
@@ -16,6 +20,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   R_MISSING_SLOT: '有必填槽位未填写，请检查素材是否完整',
   R_INVALID_PATH: '素材路径格式无效，请选择有效的本地文件',
   R_INVALID_DURATION: '素材时长异常（可能为 0 或过大），请检查文件是否损坏',
+  R_INVALID_MATERIAL_METADATA: '素材路径或元数据无效，请重新选择素材',
   R_LOOP_TOO_MANY: '视频时长远小于配音时长，请增加更多视频片段',
   R_SRT_PARSE_ERROR: 'SRT 字幕文件格式错误，请检查时间轴格式',
   R_GENERATE_FAILED: '草稿生成失败，请查看详细错误信息',

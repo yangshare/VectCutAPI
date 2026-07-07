@@ -235,6 +235,50 @@ def test_import_template_success(fake_storage, fake_draft_module, tmp_path: Path
     assert len(fake_draft_module["load_template_args"]) == 1
 
 
+def test_import_draft_content_plaintext_saves_single_template_file(
+    temp_storage_dirs, monkeypatch
+):
+    """明文 draft_content bytes 可直接导入，不需要 ZIP。"""
+    loaded_paths: list[str] = []
+
+    def _load_template(path: str):
+        loaded_paths.append(path)
+        return _make_fake_script(_make_default_tracks())
+
+    monkeypatch.setattr(service.draft.Script_file, "load_template", _load_template)
+
+    resp = service.import_draft_content("tpl_plain", b'{"materials":[]}')
+
+    saved_path = temp_storage_dirs["templates"] / "tpl_plain" / "draft_content.json"
+    assert isinstance(resp, ImportTemplateResponse)
+    assert saved_path.read_bytes() == b'{"materials":[]}'
+    assert len(loaded_paths) == 1
+    assert loaded_paths[0].endswith("draft_content.json")
+    assert len(resp.slots) == 3
+
+
+def test_import_draft_content_rejects_encrypted_without_decrypt_dll(
+    temp_storage_dirs,
+):
+    """非 JSON bytes 且未配置服务端 DLL 时返回明确错误。"""
+    temp_storage_dirs["cfg"].jianying_decrypt_dll_path = ""
+
+    with pytest.raises(TemplateError) as exc:
+        service.import_draft_content("tpl_cipher", b"\x00\x01not-json")
+
+    assert exc.value.code == "T_ENCRYPTED_DRAFT_UNSUPPORTED"
+
+
+def test_import_draft_content_rejects_oversized_payload(temp_storage_dirs):
+    """单文件 draft_content 使用独立大小限制，不复用 ZIP 限制。"""
+    temp_storage_dirs["cfg"].max_draft_content_mb = 0
+
+    with pytest.raises(TemplateError) as exc:
+        service.import_draft_content("tpl_big", b"{}")
+
+    assert exc.value.code == "T_DRAFT_CONTENT_TOO_LARGE"
+
+
 def _write_template_zip(zip_path: Path, content: bytes | None = b"{}") -> None:
     zip_path.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -684,25 +728,25 @@ def test_render_draft_unknown_slot(fake_storage, fake_draft_module, tmp_path: Pa
             "video",
             "video_main_video_0",
             {"path": "/v.mp4", "width": 1920, "height": 1080},
-            "R_INVALID_DURATION",
+            "R_INVALID_MATERIAL_METADATA",
         ),
         (
             "video",
             "video_main_video_0",
             {"path": "/v.mp4", "duration": 5.0, "height": 1080},
-            "R_INVALID_PATH",
+            "R_INVALID_MATERIAL_METADATA",
         ),
         (
             "video",
             "video_main_video_0",
             {"duration": 5.0, "width": 1920, "height": 1080},
-            "R_INVALID_PATH",
+            "R_INVALID_MATERIAL_METADATA",
         ),
         (
             "audio",
             "audio_bgm_track_0",
             {"path": "/a.mp3"},
-            "R_INVALID_DURATION",
+            "R_INVALID_MATERIAL_METADATA",
         ),
     ],
 )
@@ -772,7 +816,7 @@ def test_render_draft_non_dict_slot_value_is_structured(
 
     with pytest.raises(RenderError) as exc:
         service.render_draft("tpl_non_dict_metadata", req)
-    assert exc.value.code == "R_INVALID_PATH"
+    assert exc.value.code == "R_INVALID_MATERIAL_METADATA"
     assert exc.value.details["metadata_type"] == "str"
 
 
@@ -1864,3 +1908,83 @@ def test_scan_slots_deduplicates_tracks_and_imported_tracks():
         "video_shared_video_0",
         "bgm_shared_bgm_0",
     ]
+
+
+def test_scan_slots_uses_locator_for_empty_track_names():
+    """真实剪映母版可能全部 track.name 为空，扫描必须保留所有轨道。"""
+    tracks = [
+        _make_track(_FakeTrackType("video"), "", seg_count=2),
+        _make_track(_FakeTrackType("video"), "", seg_count=1),
+        _make_track(_FakeTrackType("audio"), "", seg_count=1),
+        _make_track(_FakeTrackType("text"), "", seg_count=1),
+    ]
+    script = _make_fake_script(tracks)
+
+    slots = service._scan_slots_from_template(script)
+
+    assert [s["slot_id"] for s in slots] == [
+        "video_track0_seg0",
+        "video_track0_seg1",
+        "video_track1_seg0",
+        "audio_track2_seg0",
+        "subtitle_track3_seg0",
+    ]
+    assert all("locator" in slot for slot in slots)
+    assert slots[2]["track_name"] == ""
+    assert slots[2]["locator"]["track_index"] == 1
+    assert slots[2]["locator"]["segment_index"] == 0
+
+
+def test_render_draft_uses_locator_when_track_name_is_empty(
+    fake_storage, monkeypatch, tmp_path: Path
+):
+    """slot 配置有 locator 时，空 track_name 不应导致 S_INVALID_SLOT。"""
+    video_track = _make_track(_FakeTrackType("video"), "", seg_count=1)
+    replace_calls: list[Any] = []
+    script = _make_fake_script(
+        [video_track],
+        replace_material_by_seg=lambda *args: replace_calls.append(args),
+    )
+    monkeypatch.setattr(
+        service.draft.Script_file,
+        "load_template",
+        lambda _path: script,
+    )
+    zip_path = tmp_path / "src.zip"
+    zip_path.write_bytes(b"PK\x03\x04")
+    service.import_template("tpl_locator", str(zip_path))
+
+    fake_storage["slots"]["tpl_locator"] = [
+        {
+            "slot_id": "video_track0_seg0",
+            "type": "video",
+            "track_name": "",
+            "segment_index": 0,
+            "locator": {
+                "scope": "root",
+                "track_index": 0,
+                "track_type": "video",
+                "segment_index": 0,
+            },
+        }
+    ]
+
+    from vectcut.features.template_filling.schemas import RenderDraftRequest
+
+    req = RenderDraftRequest(
+        template_id="tpl_locator",
+        slot_values={
+            "video_track0_seg0": {
+                "path": "G:/clips/clip.mp4",
+                "duration": 3.0,
+                "width": 1080,
+                "height": 1920,
+            }
+        },
+        output_draft_name="out",
+    )
+
+    resp = service.render_draft("tpl_locator", req)
+
+    assert resp.draft_id.startswith("draft_")
+    assert replace_calls[0][0] is video_track
