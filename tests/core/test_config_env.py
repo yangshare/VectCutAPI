@@ -68,6 +68,46 @@ def test_load_config_expands_env_and_preserves_new_settings_fields(tmp_path, mon
     assert cfg.oss_config.bucket_name == "oss-bucket"
 
 
+def test_load_config_expands_max_template_zip_mb_from_env(tmp_path, monkeypatch):
+    from vectcut.core.config import load_config
+
+    monkeypatch.setenv("MAX_TEMPLATE_ZIP_MB", "73")
+    path = tmp_path / "config.json"
+    path.write_text(
+        """
+        {
+          "max_template_zip_mb": "${MAX_TEMPLATE_ZIP_MB}"
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    cfg = load_config(path)
+
+    assert cfg.max_template_zip_mb == 73
+
+
+def test_load_config_uses_default_when_max_template_zip_env_placeholder_is_unset(
+    tmp_path, monkeypatch
+):
+    from vectcut.core.config import load_config
+
+    monkeypatch.delenv("MAX_TEMPLATE_ZIP_MB", raising=False)
+    path = tmp_path / "config.json"
+    path.write_text(
+        """
+        {
+          "max_template_zip_mb": "${MAX_TEMPLATE_ZIP_MB}"
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    cfg = load_config(path)
+
+    assert cfg.max_template_zip_mb == 50
+
+
 def test_load_config_with_env_preserves_special_env_chars_after_json5_parse(tmp_path, monkeypatch):
     from vectcut.core.config import load_config_with_env
 

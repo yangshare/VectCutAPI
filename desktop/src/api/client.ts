@@ -6,6 +6,7 @@ import type {
   Slot,
   SlotMapping,
   SubtitleMetadata,
+  UserConfig,
 } from '../types';
 import type { ApiError } from './errorMessages';
 
@@ -36,18 +37,48 @@ interface RenderDraftBackendResult {
   warnings?: string[];
 }
 
+interface ApiRequestContext {
+  baseURL: string;
+  auth?: {
+    username: string;
+    password: string;
+  };
+}
+
 function normalizeServerUrl(serverUrl: string | undefined): string {
   const trimmed = serverUrl?.trim();
   return trimmed ? trimmed.replace(/\/+$/, '') : DEFAULT_SERVER_URL;
 }
 
-async function getServerUrl(): Promise<string> {
+async function getRequestContext(): Promise<ApiRequestContext> {
   try {
     const config = await window.vectcut.getUserConfig();
-    return normalizeServerUrl(config.serverUrl);
+    return buildRequestContext(config);
   } catch {
-    return DEFAULT_SERVER_URL;
+    return { baseURL: DEFAULT_SERVER_URL };
   }
+}
+
+function buildRequestContext(config: UserConfig): ApiRequestContext {
+  const context: ApiRequestContext = {
+    baseURL: normalizeServerUrl(config.serverUrl),
+  };
+  const auth = buildBasicAuth(config);
+  if (auth) {
+    context.auth = auth;
+  }
+
+  return context;
+}
+
+function buildBasicAuth(config: UserConfig): ApiRequestContext['auth'] {
+  const username = config.basicAuthUsername?.trim() ?? '';
+  const password = config.basicAuthPassword ?? '';
+  if (!username && !password) {
+    return undefined;
+  }
+
+  return { username, password };
 }
 
 export function extractError<T>(envelope: ApiEnvelope<T>): ApiError | null {
@@ -84,12 +115,12 @@ function unwrapEnvelope<T>(envelope: unknown): T {
 }
 
 async function requestEnvelope<T>(config: AxiosRequestConfig): Promise<T> {
-  const baseURL = await getServerUrl();
+  const requestContext = await getRequestContext();
 
   try {
     const response = await axios.request<ApiEnvelope<T>>({
       ...config,
-      baseURL,
+      ...requestContext,
     });
 
     return unwrapEnvelope(response.data);
@@ -297,12 +328,12 @@ function isRenderDraftBackendResult(value: unknown): value is RenderDraftBackend
 
 /** 下载生成后的草稿 ZIP 到本地路径。 */
 export async function downloadDraft(taskId: string, savePath: string): Promise<string> {
-  const baseURL = await getServerUrl();
+  const requestContext = await getRequestContext();
 
   try {
     const response = await axios.request<ArrayBuffer>({
       method: 'get',
-      baseURL,
+      ...requestContext,
       url: `/api/template/download/${encodeURIComponent(taskId)}`,
       responseType: 'arraybuffer',
     });

@@ -65,15 +65,24 @@ describe('configStore', () => {
   });
 
   it('merges config patches and persists pretty JSON', async () => {
-    await expect(setUserConfig({ serverUrl: 'https://local.vectcut.test' })).resolves.toEqual({
+    await expect(setUserConfig({
       serverUrl: 'https://local.vectcut.test',
+      basicAuthUsername: 'deploy',
+    })).resolves.toEqual({
+      serverUrl: 'https://local.vectcut.test',
+      basicAuthUsername: 'deploy',
     });
 
-    const merged = await setUserConfig({ jianyingDraftDir: 'D:\\Jianying\\Drafts' });
+    const merged = await setUserConfig({
+      jianyingDraftDir: 'D:\\Jianying\\Drafts',
+      basicAuthPassword: 'secret',
+    });
 
     expect(merged).toEqual({
       serverUrl: 'https://local.vectcut.test',
       jianyingDraftDir: 'D:\\Jianying\\Drafts',
+      basicAuthUsername: 'deploy',
+      basicAuthPassword: 'secret',
     });
 
     const configPath = join(tempHome, '.vectcut', 'config.json');
@@ -86,11 +95,14 @@ describe('configStore', () => {
     await Promise.all([
       setUserConfig({ serverUrl: 'https://concurrent.vectcut.test' }),
       setUserConfig({ jianyingDraftDir: 'D:\\Jianying\\Concurrent' }),
+      setUserConfig({ basicAuthUsername: 'admin', basicAuthPassword: 'pw' }),
     ]);
 
     await expect(getUserConfig()).resolves.toEqual({
       serverUrl: 'https://concurrent.vectcut.test',
       jianyingDraftDir: 'D:\\Jianying\\Concurrent',
+      basicAuthUsername: 'admin',
+      basicAuthPassword: 'pw',
     });
   });
 

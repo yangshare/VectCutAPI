@@ -20,11 +20,13 @@ export function normalizeServerUrlForHealth(serverUrl: string): string {
 }
 
 export function buildHealthUrl(serverUrl: string): string {
-  return `${normalizeServerUrlForHealth(serverUrl)}/api/health`;
+  return `${normalizeServerUrlForHealth(serverUrl)}/health`;
 }
 
 export default function Settings({ onClose }: SettingsProps) {
   const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
+  const [basicAuthUsername, setBasicAuthUsername] = useState('');
+  const [basicAuthPassword, setBasicAuthPassword] = useState('');
   const [jianyingDir, setJianyingDir] = useState('');
   const [jianyingVersion, setJianyingVersion] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -52,6 +54,8 @@ export default function Settings({ onClose }: SettingsProps) {
           return;
         }
         setServerUrl(configuredServerUrl);
+        setBasicAuthUsername(config.basicAuthUsername ?? '');
+        setBasicAuthPassword(config.basicAuthPassword ?? '');
         setJianyingDir(detectedDir ?? '');
         setJianyingVersion(detectedVersion ?? '');
       } catch (error) {
@@ -111,6 +115,8 @@ export default function Settings({ onClose }: SettingsProps) {
     try {
       await window.vectcut.setUserConfig({
         serverUrl: normalizeServerUrlForHealth(serverUrl),
+        basicAuthUsername: basicAuthUsername.trim() || undefined,
+        basicAuthPassword: basicAuthPassword || undefined,
         jianyingDraftDir: jianyingDir || undefined,
       });
       setSaveStatus('已保存');
@@ -168,6 +174,29 @@ export default function Settings({ onClose }: SettingsProps) {
             </button>
             {connectionStatus ? <span role="status" style={connectionStyle}>{connectionStatus}</span> : null}
           </div>
+        </div>
+
+        <div style={{ display: 'grid', gap: 10 }}>
+          <span style={{ fontWeight: 700 }}>服务器认证</span>
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span>Basic Auth 用户名</span>
+            <input
+              value={basicAuthUsername}
+              onChange={(event) => setBasicAuthUsername(event.currentTarget.value)}
+              autoComplete="username"
+              style={inputStyle}
+            />
+          </label>
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span>Basic Auth 密码</span>
+            <input
+              type="password"
+              value={basicAuthPassword}
+              onChange={(event) => setBasicAuthPassword(event.currentTarget.value)}
+              autoComplete="current-password"
+              style={inputStyle}
+            />
+          </label>
         </div>
 
         <div style={{ display: 'grid', gap: 8 }}>

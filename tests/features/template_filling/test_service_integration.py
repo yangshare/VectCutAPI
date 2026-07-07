@@ -116,6 +116,56 @@ def test_full_workflow(temp_storage_dirs, mock_load_template, sample_template_zi
     assert download_resp.message
 
 
+def test_render_draft_preserves_template_resource_files(
+    temp_storage_dirs, mock_load_template, sample_template_zip
+):
+    """生成草稿 ZIP 时应保留母版目录资源，不能只输出 draft_content.json。"""
+    with zipfile.ZipFile(sample_template_zip, "a", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("Resources/cover.png", b"fake image")
+        zf.writestr("Resources/audio/bgm.mp3", b"fake audio")
+
+    import_resp = service.import_template("tpl_resources", str(sample_template_zip))
+    video_slot = next(s for s in import_resp.slots if s["type"] == "video")
+    service.save_slot_config(
+        "tpl_resources",
+        SaveSlotConfigRequest(
+            template_id="tpl_resources",
+            slots=[
+                SlotConfig(
+                    slot_id=video_slot["slot_id"],
+                    name=video_slot["name"],
+                    type=video_slot["type"],
+                    track_name=video_slot["track_name"],
+                    segment_index=video_slot["segment_index"],
+                )
+            ],
+        ),
+    )
+
+    render_resp = service.render_draft(
+        "tpl_resources",
+        RenderDraftRequest(
+            template_id="tpl_resources",
+            slot_values={
+                video_slot["slot_id"]: {
+                    "path": "E:/clips/main.mp4",
+                    "duration": 5.0,
+                    "width": 1920,
+                    "height": 1080,
+                }
+            },
+            output_draft_name="out_resources",
+        ),
+    )
+
+    generated_zip = temp_storage_dirs["generated"] / f"{render_resp.draft_id}.zip"
+    with zipfile.ZipFile(generated_zip) as zf:
+        names = set(zf.namelist())
+        assert "draft_content.json" in names
+        assert "Resources/cover.png" in names
+        assert "Resources/audio/bgm.mp3" in names
+
+
 def test_full_workflow_subtitle_import_and_cover_skip(
     temp_storage_dirs, mock_load_template, sample_template_zip
 ):

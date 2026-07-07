@@ -11,7 +11,7 @@
   "template_config_folder": "/app/data/template_configs",  // Template config storage folder
   "generated_draft_folder": "/app/data/generated",  // Generated draft output folder
   "temp_folder": "/app/data/temp",  // Temporary file folder
-  "max_template_zip_mb": 50,  // Maximum template ZIP upload size in MB
+  "max_template_zip_mb": "${MAX_TEMPLATE_ZIP_MB}",  // Maximum template ZIP upload size in MB
   "auth": {
     "api_token": "${API_AUTH_TOKEN}"  // API authentication token from environment
   },

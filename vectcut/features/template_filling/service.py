@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import uuid
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pyJianYingDraft as draft
@@ -379,6 +381,14 @@ def _validate_render_slot_config(script, slot: Dict[str, Any], template_id: str)
     return slot_type, track
 
 
+def _copy_template_resources_to_output(draft_content_path: str, output_dir: str) -> None:
+    template_dir = Path(draft_content_path).parent
+    target_dir = Path(output_dir)
+    if template_dir.resolve() == target_dir.resolve():
+        return
+    shutil.copytree(template_dir, target_dir, dirs_exist_ok=True)
+
+
 # ─── 4 个核心函数 ──────────────────────────────────────────────────────────
 
 
@@ -554,7 +564,7 @@ def render_draft(template_id: str, req) -> RenderDraftResponse:
         draft_id = f"draft_{uuid.uuid4().hex[:16]}"
         cfg = load_config()
         output_dir = os.path.join(cfg.generated_draft_folder, draft_id)
-        os.makedirs(output_dir, exist_ok=True)
+        _copy_template_resources_to_output(draft_content_path, output_dir)
         draft_json_path = os.path.join(output_dir, "draft_content.json")
         script.dump(draft_json_path)
 

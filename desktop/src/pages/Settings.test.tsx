@@ -9,12 +9,13 @@ import {
 
 describe('Settings', () => {
   it('builds health check URLs from trimmed server URLs', () => {
-    expect(buildHealthUrl(' https://example.vectcut.test/// ')).toBe('https://example.vectcut.test/api/health');
-    expect(buildHealthUrl('')).toBe('https://api.vectcut.com/api/health');
+    expect(buildHealthUrl(' https://example.vectcut.test/// ')).toBe('https://example.vectcut.test/health');
+    expect(buildHealthUrl('')).toBe('https://api.vectcut.com/health');
   });
 
   it('keeps settings persistence and health check contracts in the renderer', () => {
-    expect(settingsSource).toContain('/api/health');
+    expect(settingsSource).toContain('/health');
+    expect(settingsSource).not.toContain('/api/health');
     expect(settingsSource).toContain('setUserConfig');
     expect(settingsSource).toContain('getUserConfig');
     expect(settingsSource).toContain('detectJianyingDraftDir');

@@ -30,3 +30,11 @@ def test_root_health_endpoint_alias(monkeypatch):
     monkeypatch.setattr(app_module, "__version__", "9.9.9-test", raising=False)
     client = TestClient(app)
     _assert_healthy_response(client.get("/health"))
+
+
+def test_create_app_compatibility_factory_returns_configured_app(monkeypatch):
+    """create_app 兼容计划中的 TestClient(create_app()) 用法。"""
+    monkeypatch.setattr(app_module, "__version__", "9.9.9-test", raising=False)
+    client = TestClient(app_module.create_app())
+    _assert_healthy_response(client.get("/health"))
+    _assert_healthy_response(client.get("/api/health"))

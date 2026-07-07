@@ -193,6 +193,11 @@ def _wire_exception_handlers(app: FastAPI) -> FastAPI:
 app = _wire_exception_handlers(FastAPI(title="VectCutAPI"))
 
 
+def create_app() -> FastAPI:
+    """Compatibility factory for tests and WSGI-style app loaders."""
+    return app
+
+
 @app.get("/api/health")
 @app.get("/health")
 async def health_check():

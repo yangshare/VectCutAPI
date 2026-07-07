@@ -104,4 +104,6 @@ def load_config(path: Optional[os.PathLike] = None) -> Settings:
         raw = load_config_with_env(config_path)
     except Exception:
         return Settings()
+    if isinstance(raw, dict) and raw.get("max_template_zip_mb") == "${MAX_TEMPLATE_ZIP_MB}":
+        raw.pop("max_template_zip_mb")
     return Settings.model_validate(raw)

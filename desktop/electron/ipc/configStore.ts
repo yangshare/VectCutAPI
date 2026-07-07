@@ -37,6 +37,14 @@ function normalizeUserConfig(value: unknown): UserConfig {
     config.jianyingDraftDir = rawConfig.jianyingDraftDir;
   }
 
+  if (typeof rawConfig.basicAuthUsername === 'string') {
+    config.basicAuthUsername = rawConfig.basicAuthUsername;
+  }
+
+  if (typeof rawConfig.basicAuthPassword === 'string') {
+    config.basicAuthPassword = rawConfig.basicAuthPassword;
+  }
+
   return config;
 }
 

@@ -62,6 +62,8 @@ export interface ProbeResult {
 export interface UserConfig {
   serverUrl?: string;
   jianyingDraftDir?: string;
+  basicAuthUsername?: string;
+  basicAuthPassword?: string;
 }
 
 /** 受控 preload API（渲染进程公开契约） */

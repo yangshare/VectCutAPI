@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import type { AxiosRequestConfig } from 'axios';
 import type { ImportTemplateResult, RenderDraftResult } from '../../src/api/client';
+import type { UserConfig } from '../../src/types';
 
 const axiosRequest = vi.fn();
 
@@ -12,13 +13,16 @@ vi.mock('axios', () => ({
 
 const zipBytes = new Uint8Array([1, 2, 3, 4]).buffer;
 
-function installVectcutApi(serverUrl?: string) {
+function installVectcutApi(configOrServerUrl?: Partial<UserConfig> | string) {
+  const config = typeof configOrServerUrl === 'string'
+    ? { serverUrl: configOrServerUrl }
+    : (configOrServerUrl ?? {});
   vi.stubGlobal('window', {
     vectcut: {
       readZipFile: vi.fn().mockResolvedValue(zipBytes),
       writeZipFile: vi.fn().mockResolvedValue(undefined),
       selectDraftSavePath: vi.fn().mockResolvedValue('D:\\downloads\\draft.zip'),
-      getUserConfig: vi.fn().mockResolvedValue(serverUrl ? { serverUrl } : {}),
+      getUserConfig: vi.fn().mockResolvedValue(config),
     },
   });
 }
@@ -313,6 +317,27 @@ describe('api client', () => {
     expect((axiosRequest.mock.calls[1][0] as AxiosRequestConfig).baseURL).toBe('https://api.two.test');
   });
 
+  it('sends configured Basic Auth credentials on API envelope requests', async () => {
+    installVectcutApi({
+      serverUrl: 'https://secure.vectcut.test',
+      basicAuthUsername: 'admin',
+      basicAuthPassword: 'secret',
+    });
+    const { saveSlotConfig } = await import('../../src/api/client');
+    axiosRequest.mockResolvedValueOnce({
+      data: { success: true, output: { slot_count: 1, message: 'ok' }, error: null },
+    });
+
+    await saveSlotConfig('tpl-1', [
+      { slot_id: 'video-1', type: 'video', track_name: 'Video', segment_index: 0 },
+    ]);
+
+    expect(axiosRequest).toHaveBeenCalledWith(expect.objectContaining({
+      baseURL: 'https://secure.vectcut.test',
+      auth: { username: 'admin', password: 'secret' },
+    }));
+  });
+
   it('parses JSON error envelopes from arraybuffer downloads without Buffer', async () => {
     const { downloadDraft } = await import('../../src/api/client');
     const envelope = {
@@ -364,6 +389,11 @@ describe('api client', () => {
   });
 
   it('writes successful draft downloads through the controlled preload API', async () => {
+    installVectcutApi({
+      serverUrl: 'https://secure.vectcut.test',
+      basicAuthUsername: 'admin',
+      basicAuthPassword: 'secret',
+    });
     const { downloadDraft } = await import('../../src/api/client');
     const data = new Uint8Array([0x50, 0x4b, 1, 2]).buffer;
     axiosRequest.mockResolvedValueOnce({
@@ -374,6 +404,10 @@ describe('api client', () => {
     const result = await downloadDraft('task-1', 'D:\\downloads\\draft.zip');
 
     expect(result).toBe('D:\\downloads\\draft.zip');
+    expect(axiosRequest).toHaveBeenCalledWith(expect.objectContaining({
+      baseURL: 'https://secure.vectcut.test',
+      auth: { username: 'admin', password: 'secret' },
+    }));
     expect(window.vectcut.writeZipFile).toHaveBeenCalledWith('D:\\downloads\\draft.zip', data);
   });
 

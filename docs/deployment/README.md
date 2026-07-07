@@ -89,6 +89,9 @@ htpasswd -c docker/ssl/.htpasswd admin
 
 `.htpasswd`、证书和私钥已被 `docker/.gitignore` 忽略，不要提交到仓库。
 
+桌面客户端连接生产服务时，在设置页填写同一组 Basic Auth 用户名和密码。
+设置页的“测试连接”访问未认证的 `/health`，业务接口请求会自动携带认证。
+
 ### 3. 启动完整栈
 
 ```bash
@@ -237,4 +240,5 @@ docker volume inspect vectcutapi_generated_data
 - Compose 可解析，并持久化关键数据卷。
 - Nginx 支持 HTTPS、HTTP 跳转、限流和 `/api` 前缀保留转发。
 - `/api/` 默认受 Basic Auth 保护，`/health` 保持未认证。
+- 桌面客户端生产环境已配置 Basic Auth 用户名和密码。
 - 备份脚本可生成三个业务数据卷归档。
