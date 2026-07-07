@@ -108,3 +108,118 @@ npm run dev
 - 3 种风格母版（口播/Vlog/教程）、Golden 测试和边界情况测试。
 
 缺失条件补齐后，请按“后端联调步骤”逐项重新验收，并把结果补充回本报告。
+
+## 2026-07-07 本机真实母版验证记录
+
+### 输入
+
+- 母版目录：`D:\Program Files (x86)\JianyingPro Drafts\@模板【双楠】`
+- 素材目录：`G:\剪映剪辑\小说素材\素材`
+- 剪映草稿根目录：`D:\Program Files (x86)\JianyingPro Drafts`
+
+### 自动化与构建验证
+
+| 验证项 | 命令 | 结果 |
+| --- | --- | --- |
+| 桌面单测 | `cd desktop && npm test` | 15 个测试文件、199 个测试通过。 |
+| 桌面类型检查 | `cd desktop && npx tsc --noEmit -p tsconfig.json && npx tsc --noEmit -p tsconfig.node.json` | 通过。 |
+| 桌面构建 | `cd desktop && npm run build` | 通过，生成 `out/main`、`out/preload`、`out/renderer`。 |
+| packer/mediaProbe/jianyingDir 单测 | `cd desktop && npm test -- packer mediaProbe jianyingDir` | 3 个测试文件、56 个测试通过。 |
+| 后端相关测试 | `python -m pytest tests/features/template_filling/test_service_integration.py tests/core/test_pyjianying_assumptions.py -q` | 14 个通过、3 个跳过。 |
+
+### 本机文件与素材验证
+
+| 验证项 | 结果 |
+| --- | --- |
+| 母版目录存在 | 通过，目录根下存在 `draft_content.json`。 |
+| 母版体积 | 70 个文件，总大小约 398.87MB。 |
+| 客户端同类打包产物 | `Compress-Archive` 生成 ZIP 约 227.16MB。 |
+| 素材目录存在 | 通过。 |
+| 素材类型统计 | 发现视频、图片、音频；未发现 `.srt`，仅发现 1 个 `.txt`。 |
+| ffprobe 视频探测 | `merged_video_0min_batch5.mp4` 可探测，1080x1920，0.084s。 |
+| ffprobe BGM 探测 | `12 NOT AT ONE.m4a` 可探测，约 39.997s。 |
+| ffprobe 封面图探测 | `微信图片_20251001143228_55808_1.jpg` 可探测，570x687。 |
+
+### 真实母版导入链路验证
+
+| 验证项 | 结果 | 证据 |
+| --- | --- | --- |
+| 直接读取当前 `draft_content.json` | 失败 | `pyJianYingDraft.Script_file.load_template` 报 `JSONDecodeError: Extra data: line 1 column 2 (char 1)`。 |
+| 解密当前 `draft_content.json` | 通过 | `python scripts\jy_decrypt.py ...` 返回 `ok=True`，明文 139628 字节，合法 JSON。 |
+| 明文哈希对比 | 通过 | 解密结果与 `tests/golden/shuangnan.plain.json` SHA256 均为 `8a305cab99f3208142a4072207accba3dfe128d91afbae85f20031cbba66d9a5`。 |
+| HTTP 导入密文 ZIP | 失败 | `/api/template/import` 返回 `T_INVALID_ZIP`，reason 为 `Extra data: line 1 column 2 (char 1)`。 |
+| HTTP 导入明文 ZIP | 部分通过 | 返回成功，但只扫描出 1 个槽位：`subtitle__0`。 |
+| 槽位类型覆盖 | 失败 | 实际只有 `subtitle`，未识别出 video/audio/bgm/cover。 |
+| 保存明文槽位配置 | 通过 | `/api/template/slot-config` 返回成功，`slot_count=1`。 |
+| 渲染明文槽位 | 失败 | `/api/template/render` 返回 `S_INVALID_SLOT`，原因是槽位 `track_name` 为空字符串。 |
+
+### 当前结论
+
+这份真实母版目前不能完成桌面端“导入母版 → 配置 5 类槽位 → 填素材 → 生成并导入剪映”的端到端验收。阻塞点按执行顺序为：
+
+1. 当前母版打包后约 227.16MB，超过桌面 `readZipFile` 的 100MB 上限，也超过后端默认 `max_template_zip_mb=50`。
+2. 当前 `draft_content.json` 是剪映加密格式，后端导入链路不会自动解密，上传后会返回 `T_INVALID_ZIP`。
+3. 即使先用本机 `videoeditor.dll` 解密成明文，现有槽位扫描只能识别出 1 个顶层 `subtitle` 槽位；该母版的主要内容位于嵌套 composition/draft 结构中。
+4. 该唯一 `subtitle` 槽位的 `track_name` 为空，保存配置后渲染阶段会被 `S_INVALID_SLOT` 拦截。
+
+### 后续修复清单
+
+- 桌面端与后端上传大小限制需要统一配置；至少要能覆盖本机 227MB 级真实母版，或在 UI 中提前给出明确错误。
+- 后端导入真实剪映 8.9/10.x 母版前，需要支持加密 `draft_content.json` 的解密，或要求用户先导出/提供明文草稿。
+- `template_filling` 槽位扫描需要支持嵌套 `materials.drafts[].draft.tracks`，不能只扫描顶层 `tracks/imported_tracks`。
+- 槽位扫描遇到空轨道名时需要生成稳定可解析的 track 标识，避免 `track_name=""` 通过导入但在渲染阶段失败。
+- 需要准备真实 `.srt` 字幕文件，或在桌面端允许用 `.txt` 作为字幕输入时明确转换/校验为 SRT。
+
+## 2026-07-07 本机真实母版验证记录：书亦青黛
+
+### 输入
+
+- 母版目录：`D:\Program Files (x86)\JianyingPro Drafts\书亦青黛`
+- 素材目录：`G:\剪映剪辑\小说素材\素材`
+- 剪映草稿根目录：`D:\Program Files (x86)\JianyingPro Drafts`
+
+### 本机文件与格式验证
+
+| 验证项 | 结果 |
+| --- | --- |
+| 母版目录存在 | 通过，目录根下存在 `draft_content.json`。 |
+| 母版体积 | 77 个文件，总大小约 415.51MB。 |
+| 客户端同类打包产物 | `Compress-Archive` 生成 ZIP 约 238.86MB。 |
+| 直接读取当前 `draft_content.json` | 失败，`pyJianYingDraft.Script_file.load_template` 报 `JSONDecodeError: Extra data: line 1 column 2 (char 1)`。 |
+| 解密当前 `draft_content.json` | 通过，`python scripts\jy_decrypt.py ...` 返回 `ok=True`，明文 2445670 字节，合法 JSON。 |
+
+### 明文槽位扫描
+
+| 验证项 | 结果 |
+| --- | --- |
+| pyJianYingDraft 加载明文 | 通过。 |
+| 顶层轨道统计 | `tracks=0`、`imported_tracks=11`。 |
+| 槽位数量 | 37 个槽位。 |
+| 槽位类型 | `video=35`、`subtitle=1`、`audio=1`。 |
+| BGM/cover 槽位 | 未识别出 `bgm`、`cover_image`、`cover_title`。 |
+| 空轨道名 | 37/37 个槽位的 `track_name` 都是空字符串。 |
+
+### HTTP 链路验证
+
+| 验证项 | 结果 | 证据 |
+| --- | --- | --- |
+| HTTP 导入密文 ZIP | 失败 | `/api/template/import` 返回 `T_INVALID_ZIP`，reason 为 `Extra data: line 1 column 2 (char 1)`。 |
+| HTTP 导入明文 ZIP | 部分通过 | 返回成功，扫描出 37 个槽位：35 video、1 subtitle、1 audio。 |
+| 保存明文槽位配置 | 通过 | `/api/template/slot-config` 返回成功，`slot_count=37`。 |
+| 渲染明文槽位 | 失败 | `/api/template/render` 返回 `S_INVALID_SLOT`，原因是第一个 video 槽位 `track_name` 为空字符串。 |
+
+### 当前结论
+
+`书亦青黛` 比 `@模板【双楠】` 更接近现有扫描模型：解密后可以识别出 video/audio/subtitle 槽位。但它仍不能完成端到端验收：
+
+1. 实际打包 ZIP 约 238.86MB，超过桌面 `readZipFile` 的 100MB 上限，也超过后端默认 `max_template_zip_mb=50`。
+2. 当前 `draft_content.json` 是剪映加密格式，后端不会自动解密，直接上传会返回 `T_INVALID_ZIP`。
+3. 解密后虽然能扫描 37 个槽位，但所有槽位 `track_name` 都为空，保存配置后渲染阶段会返回 `S_INVALID_SLOT`。
+4. 当前扫描结果仍不覆盖 5 类槽位；缺少 `bgm`、`cover_image`、`cover_title`。
+
+### 后续修复清单增量
+
+- 槽位解析不能依赖非空 `track.name`；真实剪映模板常见空轨道名，需要使用轨道 id、轨道序号或其它稳定定位信息。
+- `slot_resolver.resolve_slot_to_track` 需要支持空轨道名场景，或导入阶段就生成可回查的内部轨道标识。
+- 需要区分普通 `audio` 与 `bgm` 的真实模板判定策略；该母版有 1 个 audio 但未被归类为 bgm。
+- 若要验证 5 类槽位，还需要 cover 槽位扫描/配置/渲染实现，而不是依赖当前自动扫描结果。

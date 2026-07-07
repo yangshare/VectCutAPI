@@ -12,6 +12,8 @@ test('window.vectcut exposes controlled IPC methods to the renderer', () => {
   expectTypeOf<Window['vectcut']['setUserConfig']>().parameter(0).toEqualTypeOf<{
     serverUrl?: string;
     jianyingDraftDir?: string;
+    basicAuthUsername?: string;
+    basicAuthPassword?: string;
   }>();
   expectTypeOf<Window['vectcut']['setUserConfig']>().returns.resolves.toEqualTypeOf<UserConfig>();
   expectTypeOf<Window['vectcut']['readZipFile']>().returns.resolves.toEqualTypeOf<ArrayBuffer>();
