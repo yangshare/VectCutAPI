@@ -25,3 +25,4 @@ desktop/*.local
 .codegraph/
 CLAUDE.md
 .superpowers/
+logs/
