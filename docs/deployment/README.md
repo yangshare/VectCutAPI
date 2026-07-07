@@ -10,8 +10,8 @@
 git clone <repo-url>
 cd VectCutAPI
 
-python -m venv venv
-source venv/bin/activate
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 
 cp config.json.example config.json

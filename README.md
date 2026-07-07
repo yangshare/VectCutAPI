@@ -98,9 +98,9 @@ git clone https://github.com/sun-guannan/VectCutAPI.git
 cd VectCutAPI
 
 # 2. 创建虚拟环境 (推荐)
-python -m venv venv-capcut
-source venv-capcut/bin/activate  # Linux/macOS
-# 或 venv-capcut\Scripts\activate  # Windows
+python -m venv .venv
+source .venv/bin/activate  # Linux/macOS
+# 或 .venv\Scripts\activate  # Windows
 
 # 3. 安装依赖
 pip install -r requirements.txt      # HTTP API 基础依赖
