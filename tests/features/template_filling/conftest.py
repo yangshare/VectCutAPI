@@ -61,15 +61,16 @@ class FakeTrack:
 
 
 class FakeScript:
-    """模拟 Script_file：tracks + get_imported_track + dump + replace_material_by_seg。
+    """模拟 Script_file：tracks + get_imported_track + dump + replace/import_srt。
 
     dump 写一个空 JSON 到指定路径（让 service.render_draft 能继续走流程）。
-    replace_material_by_seg 记录调用以便断言。
+    replace_material_by_seg / import_srt 记录调用以便断言。
     """
 
     def __init__(self, tracks: List[FakeTrack]):
         self.tracks = list(tracks)
         self.replace_calls: List[Any] = []
+        self.import_srt_calls: List[Any] = []
         self.dump_calls: List[str] = []
 
     def get_imported_track(self, track_type, name=None, index=None):
@@ -85,6 +86,13 @@ class FakeScript:
 
     def replace_material_by_seg(self, track, segment_index, material) -> None:
         self.replace_calls.append((track, segment_index, material))
+
+    def import_srt(self, srt_content: str, track_name: str, **kwargs) -> None:
+        self.import_srt_calls.append((srt_content, track_name, kwargs))
+        for track in self.tracks:
+            if track.name == track_name:
+                track.segments.append(FakeSegment())
+                break
 
 
 # ─── fixtures ────────────────────────────────────────────────────────────────

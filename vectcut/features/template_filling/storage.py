@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import ctypes
+from ctypes import wintypes
 from contextlib import contextmanager
 from dataclasses import dataclass
 import hashlib
@@ -30,6 +32,9 @@ from vectcut.core.logger import sanitize_exception
 
 _MAX_TEMPLATE_ZIP_FILES = 10_000
 _WINDOWS_ABSOLUTE_ZIP_MEMBER_RE = re.compile(r"^[A-Za-z]:[\\/]")
+_WINDOWS_ERROR_ACCESS_DENIED = 5
+_WINDOWS_PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+_WINDOWS_STILL_ACTIVE = 259
 _TEMPLATE_LOCK_POLL_SECONDS = 0.05
 _DEFAULT_TEMPLATE_LOCK_STALE_SECONDS = 300.0
 _logger = logging.getLogger("vectcut.features.template_filling.storage")
@@ -60,11 +65,51 @@ def _safe_template_lock_name(template_id: str) -> str:
 def _is_pid_alive(pid: int) -> bool:
     if pid <= 0:
         return False
+    if os.name == "nt":
+        return _is_windows_pid_alive(pid)
     try:
         os.kill(pid, 0)
     except OSError:
         return False
     return True
+
+
+def _is_windows_pid_alive(pid: int) -> bool:
+    try:
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    except (AttributeError, OSError):
+        return True
+
+    open_process = kernel32.OpenProcess
+
+    try:
+        open_process.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        open_process.restype = wintypes.HANDLE
+    except (AttributeError, TypeError):
+        pass
+
+    handle = open_process(_WINDOWS_PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        return ctypes.get_last_error() == _WINDOWS_ERROR_ACCESS_DENIED
+
+    get_exit_code_process = kernel32.GetExitCodeProcess
+    close_handle = kernel32.CloseHandle
+
+    try:
+        get_exit_code_process.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+        get_exit_code_process.restype = wintypes.BOOL
+        close_handle.argtypes = [wintypes.HANDLE]
+        close_handle.restype = wintypes.BOOL
+    except (AttributeError, TypeError):
+        pass
+
+    try:
+        exit_code = wintypes.DWORD()
+        if not get_exit_code_process(handle, ctypes.byref(exit_code)):
+            return True
+        return exit_code.value == _WINDOWS_STILL_ACTIVE
+    finally:
+        close_handle(handle)
 
 
 def _read_lock_metadata(lock_path: Path) -> dict:

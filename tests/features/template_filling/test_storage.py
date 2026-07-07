@@ -35,6 +35,77 @@ def fake_cfg(tmp_path: Path, monkeypatch):
     return cfg
 
 
+def test_is_pid_alive_on_windows_does_not_send_signal(monkeypatch):
+    """Windows 下 os.kill(pid, 0) 会发送 CTRL_C_EVENT，不能用于探活。"""
+    monkeypatch.setattr(storage.os, "name", "nt", raising=False)
+    monkeypatch.setattr(storage, "_is_windows_pid_alive", lambda pid: True, raising=False)
+
+    def _fail_if_signaled(pid, signal_number):
+        raise AssertionError("os.kill must not be used for Windows pid liveness checks")
+
+    monkeypatch.setattr(storage.os, "kill", _fail_if_signaled)
+
+    assert storage._is_pid_alive(12345) is True
+
+
+def test_is_windows_pid_alive_queries_process_exit_code(monkeypatch):
+    observed = {}
+    closed_handles = []
+
+    class _FakeKernel32:
+        def OpenProcess(self, access, inherit_handle, pid):
+            observed["open_process"] = (access, inherit_handle, pid)
+            return 42
+
+        def GetExitCodeProcess(self, handle, exit_code):
+            observed["get_exit_code"] = handle
+            exit_code.value = 259
+            return 1
+
+        def CloseHandle(self, handle):
+            closed_handles.append(handle)
+            return 1
+
+    _install_fake_windows_ctypes(monkeypatch, _FakeKernel32())
+
+    assert storage._is_windows_pid_alive(12345) is True
+    assert observed["open_process"] == (0x1000, False, 12345)
+    assert observed["get_exit_code"] == 42
+    assert closed_handles == [42]
+
+
+def test_is_windows_pid_alive_treats_access_denied_as_alive(monkeypatch):
+    class _FakeKernel32:
+        def OpenProcess(self, access, inherit_handle, pid):
+            return 0
+
+    _install_fake_windows_ctypes(monkeypatch, _FakeKernel32(), last_error=5)
+
+    assert storage._is_windows_pid_alive(4) is True
+
+
+class _FakeDWORD:
+    def __init__(self):
+        self.value = 0
+
+
+def _install_fake_windows_ctypes(monkeypatch, kernel32, last_error=0):
+    import ctypes
+    from ctypes import wintypes
+
+    monkeypatch.setattr(storage, "ctypes", ctypes, raising=False)
+    monkeypatch.setattr(storage, "wintypes", wintypes, raising=False)
+    monkeypatch.setattr(
+        storage.ctypes,
+        "WinDLL",
+        lambda name, use_last_error: kernel32,
+        raising=False,
+    )
+    monkeypatch.setattr(storage.ctypes, "get_last_error", lambda: last_error)
+    monkeypatch.setattr(storage.ctypes, "byref", lambda value: value)
+    monkeypatch.setattr(storage.wintypes, "DWORD", _FakeDWORD)
+
+
 # ─── save_template_zip ─────────────────────────────────────────────────────
 
 

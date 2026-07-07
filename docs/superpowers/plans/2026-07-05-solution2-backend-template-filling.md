@@ -10,6 +10,12 @@
 
 **前置依赖：** 核心假设验证（方案二 §0）必须通过，否则停止本计划
 
+**执行更新（2026-07-07）：**
+- 已落地：`template_filling` 后端模块、FastAPI 路由挂载、配置项、README 章节、单测/集成测试、合成 golden 测试。
+- 已补齐：真实 `load_template()` 的 `imported_tracks` 槽位扫描、视频/音频素材替换、字幕 SRT 替换并继承母版片段样式、结构化错误、时长对齐预检 warnings。
+- 验证：`python -m pytest tests -q --tb=short` -> `515 passed, 5 skipped`。
+- 未完成/需人工：真实剪映导出 `tests/fixtures/sample_template.zip` 仍缺失，相关真实兼容测试继续 skip；时长对齐当前只做预检 warning，不实际复制/新增剪映视频循环片段；封面图/封面标题替换仍按 MVP 范围保持不支持 warning。
+
 ---
 
 ## 文件结构
@@ -264,7 +270,7 @@ pytest tests/core/test_pyjianying_assumptions.py -v -s
 - [x] `Script_file.load_template()` 返回对象有 `.tracks`、`.get_imported_track()`、`.dump()` 方法
 - [x] `script.tracks[i]` 有 `.name`、`.track_type`、`.segments` 属性
 - [x] `script.replace_material_by_seg()` 方法存在且签名正确
-- [x] 准备了真实的 `sample_template.zip` fixture
+- [ ] 准备了真实的 `sample_template.zip` fixture（2026-07-07 仍缺失，相关测试显式 skip）
 
 **若任何测试失败，必须调整方案或寻找替代方案，不可继续任务 1。**
 
@@ -2309,7 +2315,7 @@ git commit -m "feat(template): mount router and add config entries"
 
 ## 任务 10：文档与验收
 
-- [ ] **步骤 10.1：更新 README.md，新增 template_filling 章节**
+- [x] **步骤 10.1：更新 README.md，新增 template_filling 章节**
 
 在 README.md 的功能列表中追加：
 
@@ -2330,19 +2336,20 @@ git commit -m "feat(template): mount router and add config entries"
 详见 `docs/superpowers/specs/2026-07-04-solution2-desktop-client.md`。
 ```
 
-- [ ] **步骤 10.2：验收清单（对照方案二 §18 MVP 范围）**
+- [x] **步骤 10.2：验收清单（对照方案二 §18 MVP 范围）**
 
 逐项确认：
 
-- [ ] 导入母版 zip，自动识别 video/audio/bgm/subtitle 槽位
-- [ ] 保存槽位配置
-- [ ] 渲染草稿：替换视频/音频素材（绕过 ffprobe）
-- [ ] 渲染草稿：替换字幕文本（继承母版样式）
-- [ ] 时长对齐：视频循环填充（覆盖 §7.0 的 7 种边界）
-- [ ] 下载草稿 zip
-- [ ] 错误处理：TemplateError/SlotError/RenderError 全部走统一信封
-- [ ] 测试覆盖：单测 + 集成测试 + 路由测试 全部通过
-- [ ] 文档更新
+- [x] 导入母版 zip，自动识别 video/audio/bgm/subtitle 槽位（已兼容 `script.imported_tracks`）
+- [x] 保存槽位配置
+- [x] 渲染草稿：替换视频/音频素材（绕过 ffprobe）
+- [x] 渲染草稿：替换字幕文本（继承母版样式）
+- [ ] 时长对齐：视频循环填充（算法已测；service 当前只做预检 warnings，未实际复制/新增循环片段）
+- [x] 下载草稿 zip
+- [x] 错误处理：TemplateError/SlotError/RenderError 全部走统一信封
+- [x] 测试覆盖：单测 + 集成测试 + 路由测试 全部通过（2026-07-07：`515 passed, 5 skipped`）
+- [x] 文档更新
+- [ ] 真实剪映导出 fixture：`tests/fixtures/sample_template.zip`（缺失时真实兼容测试显式 skip）
 
 - [ ] **步骤 10.3：最终 Commit**
 

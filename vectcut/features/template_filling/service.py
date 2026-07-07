@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import re
 import uuid
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import pyJianYingDraft as draft
 
@@ -85,7 +85,7 @@ def _template_import_semantic_error(template_id: str, exc: Exception) -> Templat
 
 
 def _scan_slots_from_template(script) -> List[Dict[str, Any]]:
-    """从 script.tracks 扫描可替换槽位。
+    """从 script.tracks / script.imported_tracks 扫描可替换槽位。
 
     按轨道类型分类：
     - video → type="video"
@@ -96,10 +96,20 @@ def _scan_slots_from_template(script) -> List[Dict[str, Any]]:
     每段生成一个槽位 dict。
     """
     slots: List[Dict[str, Any]] = []
-    for track in script.tracks:
+    seen_object_ids = set()
+    seen_track_keys = set()
+    candidate_tracks = list(_iter_tracks(getattr(script, "tracks", None)))
+    candidate_tracks.extend(_iter_tracks(getattr(script, "imported_tracks", None)))
+
+    for track in candidate_tracks:
         # 用 .name 字符串比较，兼容真实 Track_type 枚举与测试 mock
         tt_name = getattr(track.track_type, "name", str(track.track_type))
         track_name = track.name
+        track_key = (tt_name, track_name)
+        if id(track) in seen_object_ids or track_key in seen_track_keys:
+            continue
+        seen_object_ids.add(id(track))
+        seen_track_keys.add(track_key)
 
         if tt_name == "video":
             slot_type = "video"
@@ -121,11 +131,148 @@ def _scan_slots_from_template(script) -> List[Dict[str, Any]]:
     return slots
 
 
+def _iter_tracks(value):
+    if value is None:
+        return []
+    if isinstance(value, dict):
+        return value.values()
+    return value
+
+
 def _replace_slot_material(script, track, slot: Dict[str, Any], material) -> None:
     slot_id = slot.get("slot_id", "")
     segment_index = slot_resolver.parse_slot_segment_index(slot)
     slot_resolver.validate_slot_segment_index(track, segment_index, slot_id)
     script.replace_material_by_seg(track, segment_index, material)
+
+
+_SRT_TIMESTAMP_RE = re.compile(
+    r"(?P<start>\d{2}:\d{2}:\d{2},\d{3})\s+-->\s+"
+    r"(?P<end>\d{2}:\d{2}:\d{2},\d{3})"
+)
+
+
+def _parse_srt_timestamp(value: str) -> float:
+    match = re.fullmatch(r"(\d{2}):(\d{2}):(\d{2}),(\d{3})", value)
+    if not match:
+        raise ValueError(f"invalid SRT timestamp: {value}")
+    hours, minutes, seconds, millis = (int(part) for part in match.groups())
+    return hours * 3600 + minutes * 60 + seconds + millis / 1000.0
+
+
+def _subtitle_parse_error(slot_id: str, reason: str) -> Exception:
+    return make_error(
+        "R_SRT_PARSE_ERROR",
+        "SRT 文件格式错误",
+        details={"slot_id": slot_id, "reason": reason},
+    )
+
+
+def _require_srt_content(slot_id: str, value: Any) -> str:
+    if not isinstance(value, dict):
+        raise _subtitle_parse_error(slot_id, "字幕槽位值必须是对象")
+    srt_content = value.get("srt_content")
+    if not isinstance(srt_content, str) or not srt_content.strip():
+        raise _subtitle_parse_error(slot_id, "srt_content 必须是非空字符串")
+    return srt_content
+
+
+def _get_srt_latest_end_seconds(slot_id: str, srt_content: str) -> float:
+    latest_end = 0.0
+    for line in srt_content.splitlines():
+        match = _SRT_TIMESTAMP_RE.fullmatch(line.strip())
+        if not match:
+            continue
+        start = _parse_srt_timestamp(match.group("start"))
+        end = _parse_srt_timestamp(match.group("end"))
+        if end <= start:
+            raise _subtitle_parse_error(slot_id, "SRT 结束时间必须晚于开始时间")
+        latest_end = max(latest_end, end)
+
+    if latest_end <= 0:
+        raise _subtitle_parse_error(slot_id, "SRT 缺少有效时间轴")
+    return latest_end
+
+
+def _import_subtitle_srt(script, track, slot: Dict[str, Any], value: Any) -> float:
+    slot_id = slot.get("slot_id", "")
+    segment_index = slot_resolver.parse_slot_segment_index(slot)
+    slot_resolver.validate_slot_segment_index(track, segment_index, slot_id)
+    srt_content = _require_srt_content(slot_id, value)
+    latest_end = _get_srt_latest_end_seconds(slot_id, srt_content)
+    style_reference = track.segments[segment_index]
+    old_segments = list(track.segments)
+    track.segments.clear()
+
+    try:
+        script.import_srt(
+            srt_content,
+            track.name,
+            style_reference=style_reference,
+            clip_settings=None,
+        )
+    except ValueError as exc:
+        track.segments[:] = old_segments
+        raise _subtitle_parse_error(slot_id, sanitize_exception(exc)) from exc
+    except Exception:
+        track.segments[:] = old_segments
+        raise
+
+    return latest_end
+
+
+def _metadata_duration_seconds(value: Any) -> Optional[float]:
+    if not isinstance(value, dict):
+        return None
+    duration = value.get("duration")
+    if isinstance(duration, bool):
+        return None
+    try:
+        duration_value = float(duration)
+    except (TypeError, ValueError):
+        return None
+    if duration_value <= 0:
+        return None
+    return duration_value
+
+
+def _select_alignment_target(
+    video_durations: List[float],
+    audio_durations: List[float],
+    bgm_durations: List[float],
+    subtitle_latest_end_seconds: Optional[float],
+) -> Optional[float]:
+    if audio_durations:
+        return max(audio_durations)
+    if subtitle_latest_end_seconds and subtitle_latest_end_seconds > 0:
+        return subtitle_latest_end_seconds
+    if video_durations:
+        return sum(video_durations)
+    if bgm_durations:
+        return max(bgm_durations)
+    return None
+
+
+def _merge_duration_alignment_warnings(
+    warnings: List[str],
+    video_durations: List[float],
+    bgm_durations: List[float],
+    target_duration: Optional[float],
+) -> None:
+    if target_duration is None:
+        return
+    if video_durations:
+        _, video_warnings = duration_calculator.calculate_video_loop_fill(
+            video_durations,
+            target_duration,
+        )
+        warnings.extend(video_warnings)
+    for bgm_duration in bgm_durations:
+        _, bgm_warnings = duration_calculator.calculate_bgm_alignment(
+            bgm_duration,
+            target_duration,
+        )
+        warnings.extend(bgm_warnings)
 
 
 def _build_slot_map(slots_config: List[Dict[str, Any]], template_id: str) -> Dict[str, Dict[str, Any]]:
@@ -320,7 +467,7 @@ def render_draft(template_id: str, req) -> RenderDraftResponse:
     1. 加载母版 + 槽位配置
     2. 构建 slot_id → slot 映射
     3. 遍历 slot_values 按类型替换素材
-    4. 时长对齐（MVP 仅收集 warnings，不实际调整片段）
+    4. 时长对齐预检（仅收集 warnings，不实际改写草稿时长）
     5. 导出草稿 + 打包 zip
     """
     _validate_template_id(template_id)
@@ -347,6 +494,10 @@ def render_draft(template_id: str, req) -> RenderDraftResponse:
         _validate_required_slot_values(slot_map, req.slot_values, template_id)
 
         warnings: List[str] = []
+        video_duration_entries: List[tuple[int, str, int, float]] = []
+        audio_durations: List[float] = []
+        bgm_durations: List[float] = []
+        subtitle_latest_end_seconds: Optional[float] = None
 
         # 3. 遍历 slot_values，按槽位类型处理
         for slot_id, value in req.slot_values.items():
@@ -359,15 +510,45 @@ def render_draft(template_id: str, req) -> RenderDraftResponse:
                 else:
                     mat = material_builder.build_audio_material_from_metadata(value)
                 _replace_slot_material(script, track, slot, mat)
+                duration = _metadata_duration_seconds(value)
+                if duration is not None:
+                    if slot_type == "video":
+                        video_duration_entries.append((
+                            int(slot.get("_slot_index", 0)),
+                            str(slot.get("track_name", "")),
+                            slot_resolver.parse_slot_segment_index(slot),
+                            duration,
+                        ))
+                    elif slot_type == "bgm":
+                        bgm_durations.append(duration)
+                    else:
+                        audio_durations.append(duration)
             elif slot_type == "subtitle":
-                # MVP: 字幕替换先跳过，加 warning
-                warnings.append(f"字幕槽位 {slot_id} 替换暂未实现（MVP）")
+                latest_end = _import_subtitle_srt(script, track, slot, value)
+                subtitle_latest_end_seconds = max(
+                    subtitle_latest_end_seconds or 0.0,
+                    latest_end,
+                )
             elif slot_type in ("cover_image", "cover_title"):
                 warnings.append(f"封面槽位 {slot_id} 替换暂未实现（MVP）")
 
-        # 4. 时长对齐（MVP: 仅计算信息，不实际调整片段 — 标注 TODO）
-        # TODO: 收集视频段时长，调用 calculate_video_loop_fill / calculate_bgm_alignment
-        # MVP 阶段跳过实际对齐
+        # 4. 时长对齐预检：合并非致命 warning，不复制/新增剪映片段。
+        video_durations = [
+            duration
+            for *_sort_key, duration in sorted(video_duration_entries)
+        ]
+        target_duration = _select_alignment_target(
+            video_durations,
+            audio_durations,
+            bgm_durations,
+            subtitle_latest_end_seconds,
+        )
+        _merge_duration_alignment_warnings(
+            warnings,
+            video_durations,
+            bgm_durations,
+            target_duration,
+        )
 
         # 5. 导出草稿
         draft_id = f"draft_{uuid.uuid4().hex[:16]}"

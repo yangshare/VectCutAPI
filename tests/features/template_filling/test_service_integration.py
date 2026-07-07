@@ -116,10 +116,10 @@ def test_full_workflow(temp_storage_dirs, mock_load_template, sample_template_zi
     assert download_resp.message
 
 
-def test_full_workflow_subtitle_and_cover_skip(
+def test_full_workflow_subtitle_import_and_cover_skip(
     temp_storage_dirs, mock_load_template, sample_template_zip
 ):
-    """subtitle / cover 槽位在 MVP 阶段跳过替换，加入 warning。"""
+    """subtitle 调用 import_srt；cover 槽位暂不支持并加入 warning。"""
     # import 拿到全部槽位
     import_resp = service.import_template("tpl_skip", str(sample_template_zip))
 
@@ -155,8 +155,15 @@ def test_full_workflow_subtitle_and_cover_skip(
         },
         output_draft_name="out",
     )
+    expected_style_reference = mock_load_template.tracks[2].segments[0]
     resp = service.render_draft("tpl_skip", render_req)
-    assert any("字幕" in w for w in resp.warnings)
+    assert len(mock_load_template.import_srt_calls) == 1
+    srt_content, track_name, kwargs = mock_load_template.import_srt_calls[0]
+    assert srt_content == "1\n00:00:01,000 --> 00:00:02,000\nhi\n"
+    assert track_name == subtitle_slot["track_name"]
+    assert kwargs["style_reference"] is expected_style_reference
+    assert kwargs["clip_settings"] is None
+    assert not any("字幕" in w and "暂未实现" in w for w in resp.warnings)
     assert any("封面" in w for w in resp.warnings)
 
 

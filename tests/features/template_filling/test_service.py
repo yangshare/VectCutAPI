@@ -152,6 +152,7 @@ def _make_fake_script(
     tracks: List[SimpleNamespace],
     *,
     replace_material_by_seg: Any = None,
+    import_srt: Any = None,
 ) -> SimpleNamespace:
     """构造一个 mock 的 Script_file，包含 dump + 可选的 replace_material_by_seg。"""
 
@@ -170,15 +171,20 @@ def _make_fake_script(
         dump=_dump,
         get_imported_track=_get_imported_track,
         replace_material_by_seg=replace_material_by_seg or (lambda *a, **k: None),
+        import_srt=import_srt or (lambda *a, **k: None),
     )
 
 
-# 默认 tracks：一条 video + 一条 audio(bgm) + 一条 text
-_DEFAULT_TRACKS = [
-    _make_track(_FakeTrackType("video"), "main_video", seg_count=1),
-    _make_track(_FakeTrackType("audio"), "bgm_track", seg_count=1),
-    _make_track(_FakeTrackType("text"), "subtitle_track", seg_count=1),
-]
+def _make_default_tracks() -> List[SimpleNamespace]:
+    """默认 tracks：一条 video + 一条 audio(bgm) + 一条 text。"""
+    return [
+        _make_track(_FakeTrackType("video"), "main_video", seg_count=1),
+        _make_track(_FakeTrackType("audio"), "bgm_track", seg_count=1),
+        _make_track(_FakeTrackType("text"), "subtitle_track", seg_count=1),
+    ]
+
+
+_DEFAULT_TRACKS = _make_default_tracks()
 
 
 @pytest.fixture
@@ -191,7 +197,7 @@ def fake_draft_module(monkeypatch):
 
     def _load_template(json_path: str):
         calls["load_template_args"].append(json_path)
-        return _make_fake_script(_DEFAULT_TRACKS)
+        return _make_fake_script(_make_default_tracks())
 
     monkeypatch.setattr(service.draft.Script_file, "load_template", _load_template)
     return calls
@@ -286,7 +292,7 @@ def test_import_template_rejects_draft_info_only_and_preserves_existing_template
     monkeypatch.setattr(
         service.draft.Script_file,
         "load_template",
-        lambda _path: _make_fake_script(_DEFAULT_TRACKS),
+        lambda _path: _make_fake_script(_make_default_tracks()),
     )
 
     with pytest.raises(TemplateError) as exc:
@@ -1156,10 +1162,10 @@ def test_render_draft_video_slot_success(
     assert resp.draft_id in fake_storage["drafts"]
 
 
-def test_render_draft_subtitle_skip_with_warning(
-    fake_storage, fake_draft_module, tmp_path: Path
+def test_render_draft_subtitle_imports_srt_without_warning(
+    fake_storage, fake_draft_module, monkeypatch, tmp_path: Path
 ):
-    """subtitle 槽位：MVP 跳过替换，加入 warning。"""
+    """subtitle 槽位：调用 import_srt，并用母版片段作为样式参考。"""
     zip_path = tmp_path / "src.zip"
     zip_path.write_bytes(b"PK\x03\x04")
     service.import_template("tpl_r4", str(zip_path))
@@ -1168,20 +1174,444 @@ def test_render_draft_subtitle_skip_with_warning(
         {"slot_id": "subtitle_sub_0", "type": "subtitle",
          "track_name": "subtitle_track", "segment_index": 0}
     ]
+    import_calls: List[Any] = []
+    tracks = _make_default_tracks()
+    expected_style_reference = tracks[2].segments[0]
+
+    def _load_with_import_srt(path: str):
+        return _make_fake_script(
+            tracks,
+            import_srt=lambda *a, **k: import_calls.append((a, k)),
+        )
+
+    monkeypatch.setattr(service.draft.Script_file, "load_template", _load_with_import_srt)
 
     from vectcut.features.template_filling.schemas import RenderDraftRequest
 
+    srt_content = "1\n00:00:01,000 --> 00:00:02,000\nhi\n"
     req = RenderDraftRequest(
         template_id="tpl_r4",
         slot_values={"subtitle_sub_0": {"slot_id": "subtitle_sub_0",
-                                         "srt_content": "1\n00:00:01,000 --> 00:00:02,000\nhi\n"}},
+                                         "srt_content": srt_content}},
         output_draft_name="out",
     )
     resp = service.render_draft("tpl_r4", req)
 
     assert isinstance(resp, RenderDraftResponse)
-    assert any("字幕" in w for w in resp.warnings)
+    assert import_calls == [
+        ((srt_content, "subtitle_track"), {
+            "style_reference": expected_style_reference,
+            "clip_settings": None,
+        })
+    ]
+    assert not any("字幕" in w and "暂未实现" in w for w in resp.warnings)
     assert resp.draft_id in fake_storage["drafts"]
+
+
+def test_import_subtitle_srt_clears_old_segments_before_import_and_replaces_them():
+    """字幕替换应先清空旧段，import_srt 成功后旧字幕段不应残留。"""
+    track = _make_track(_FakeTrackType("text"), "subtitle_track", seg_count=2)
+    old_style_reference = track.segments[1]
+    new_segment = SimpleNamespace(target_timerange=SimpleNamespace(duration=2_000_000))
+    observed: Dict[str, Any] = {}
+
+    script = SimpleNamespace()
+
+    def _import_srt(srt_content: str, track_name: str, **kwargs) -> None:
+        observed["segments_before_import"] = list(track.segments)
+        observed["track_name"] = track_name
+        observed["style_reference"] = kwargs["style_reference"]
+        observed["clip_settings"] = kwargs["clip_settings"]
+        track.segments.append(new_segment)
+
+    script.import_srt = _import_srt
+
+    latest_end = service._import_subtitle_srt(
+        script,
+        track,
+        {"slot_id": "subtitle_sub_1", "segment_index": 1},
+        {"srt_content": "1\n00:00:00,000 --> 00:00:02,000\nhi\n"},
+    )
+
+    assert latest_end == 2.0
+    assert observed["segments_before_import"] == []
+    assert observed["track_name"] == "subtitle_track"
+    assert observed["style_reference"] is old_style_reference
+    assert observed["clip_settings"] is None
+    assert track.segments == [new_segment]
+
+
+def test_render_draft_subtitle_invalid_srt_maps_to_render_error(
+    fake_storage, fake_draft_module, monkeypatch, tmp_path: Path
+):
+    """pyJianYingDraft import_srt 抛 ValueError 时映射为 R_SRT_PARSE_ERROR。"""
+    zip_path = tmp_path / "src.zip"
+    zip_path.write_bytes(b"PK\x03\x04")
+    service.import_template("tpl_bad_srt", str(zip_path))
+
+    fake_storage["slots"]["tpl_bad_srt"] = [
+        {
+            "slot_id": "subtitle_sub_0",
+            "type": "subtitle",
+            "track_name": "subtitle_track",
+            "segment_index": 0,
+        }
+    ]
+    import_calls: List[Any] = []
+
+    def _raise_parse_error(*_args, **_kwargs):
+        import_calls.append((_args, _kwargs))
+        raise ValueError("Expected a number at line 1")
+
+    def _load_with_bad_srt(path: str):
+        return _make_fake_script(_make_default_tracks(), import_srt=_raise_parse_error)
+
+    monkeypatch.setattr(service.draft.Script_file, "load_template", _load_with_bad_srt)
+
+    from vectcut.features.template_filling.schemas import RenderDraftRequest
+
+    req = RenderDraftRequest(
+        template_id="tpl_bad_srt",
+        slot_values={
+            "subtitle_sub_0": {
+                "srt_content": "1\n00:00:00,000 --> 00:00:01,000\nbad\n",
+            }
+        },
+        output_draft_name="out",
+    )
+
+    with pytest.raises(RenderError) as exc:
+        service.render_draft("tpl_bad_srt", req)
+    assert exc.value.code == "R_SRT_PARSE_ERROR"
+    assert exc.value.details["slot_id"] == "subtitle_sub_0"
+    assert len(import_calls) == 1
+
+
+def test_import_subtitle_srt_restores_old_segments_when_import_value_error():
+    """import_srt 失败时恢复旧字幕段，避免破坏 script 状态。"""
+    track = _make_track(_FakeTrackType("text"), "subtitle_track", seg_count=1)
+    old_segments = list(track.segments)
+    observed: Dict[str, Any] = {}
+
+    script = SimpleNamespace()
+
+    def _import_srt(*_args, **_kwargs) -> None:
+        observed["segments_before_import"] = list(track.segments)
+        raise ValueError("segment overlap")
+
+    script.import_srt = _import_srt
+
+    with pytest.raises(RenderError) as exc:
+        service._import_subtitle_srt(
+            script,
+            track,
+            {"slot_id": "subtitle_sub_0", "segment_index": 0},
+            {"srt_content": "1\n00:00:00,000 --> 00:00:01,000\nhi\n"},
+        )
+
+    assert exc.value.code == "R_SRT_PARSE_ERROR"
+    assert observed["segments_before_import"] == []
+    assert track.segments == old_segments
+
+
+def test_import_subtitle_srt_does_not_map_non_value_error():
+    """非 ValueError 属于引擎/程序错误，不应伪装成 SRT 解析错误。"""
+    track = _make_track(_FakeTrackType("text"), "subtitle_track", seg_count=1)
+    script = SimpleNamespace(
+        import_srt=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            RuntimeError("engine failed")
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="engine failed"):
+        service._import_subtitle_srt(
+            script,
+            track,
+            {"slot_id": "subtitle_sub_0", "segment_index": 0},
+            {"srt_content": "1\n00:00:00,000 --> 00:00:01,000\nhi\n"},
+        )
+
+
+@pytest.mark.parametrize(
+    "slot_value",
+    [
+        "not-a-dict",
+        {"srt_content": ""},
+        {"srt_content": "   "},
+        {"srt_content": 123},
+    ],
+)
+def test_render_draft_subtitle_invalid_value_is_structured(
+    fake_storage, fake_draft_module, tmp_path: Path, slot_value: Any
+):
+    """subtitle value 必须是 dict 且包含非空 srt_content。"""
+    zip_path = tmp_path / "src.zip"
+    zip_path.write_bytes(b"PK\x03\x04")
+    service.import_template("tpl_invalid_srt_value", str(zip_path))
+
+    fake_storage["slots"]["tpl_invalid_srt_value"] = [
+        {
+            "slot_id": "subtitle_sub_0",
+            "type": "subtitle",
+            "track_name": "subtitle_track",
+            "segment_index": 0,
+        }
+    ]
+
+    from vectcut.features.template_filling.schemas import RenderDraftRequest
+
+    req = RenderDraftRequest(
+        template_id="tpl_invalid_srt_value",
+        slot_values={"subtitle_sub_0": slot_value},
+        output_draft_name="out",
+    )
+
+    with pytest.raises(RenderError) as exc:
+        service.render_draft("tpl_invalid_srt_value", req)
+    assert exc.value.code == "R_SRT_PARSE_ERROR"
+    assert exc.value.details["slot_id"] == "subtitle_sub_0"
+
+
+def test_render_draft_duration_alignment_uses_subtitle_target_and_merges_warnings(
+    fake_storage, fake_draft_module, tmp_path: Path
+):
+    """有字幕时以 SRT 最晚结束时间为 target，并合并视频/BGM 对齐 warnings。"""
+    zip_path = tmp_path / "src.zip"
+    zip_path.write_bytes(b"PK\x03\x04")
+    service.import_template("tpl_duration_subtitle", str(zip_path))
+
+    fake_storage["slots"]["tpl_duration_subtitle"] = [
+        {
+            "slot_id": "video_main_video_0",
+            "type": "video",
+            "track_name": "main_video",
+            "segment_index": 0,
+        },
+        {
+            "slot_id": "bgm_bgm_track_0",
+            "type": "bgm",
+            "track_name": "bgm_track",
+            "segment_index": 0,
+        },
+        {
+            "slot_id": "subtitle_sub_0",
+            "type": "subtitle",
+            "track_name": "subtitle_track",
+            "segment_index": 0,
+        },
+    ]
+
+    from vectcut.features.template_filling.schemas import RenderDraftRequest
+
+    req = RenderDraftRequest(
+        template_id="tpl_duration_subtitle",
+        slot_values={
+            "video_main_video_0": {
+                "path": "/v.mp4",
+                "duration": 1.5,
+                "width": 1920,
+                "height": 1080,
+            },
+            "bgm_bgm_track_0": {"path": "/bgm.mp3", "duration": 1.0},
+            "subtitle_sub_0": {
+                "srt_content": "1\n00:00:01,000 --> 00:00:04,000\nhi\n",
+            },
+        },
+        output_draft_name="out",
+    )
+
+    resp = service.render_draft("tpl_duration_subtitle", req)
+
+    assert any("最后一段时长 1.5s 不自然" in w for w in resp.warnings)
+    assert any("BGM 时长 1.0s 过短" in w for w in resp.warnings)
+
+
+def test_render_draft_duration_alignment_uses_video_sum_without_subtitle(
+    fake_storage, fake_draft_module, tmp_path: Path
+):
+    """无字幕时以视频素材时长总和为 target，因此短 BGM 会产生循环 warning。"""
+    zip_path = tmp_path / "src.zip"
+    zip_path.write_bytes(b"PK\x03\x04")
+    service.import_template("tpl_duration_video_sum", str(zip_path))
+
+    fake_storage["slots"]["tpl_duration_video_sum"] = [
+        {
+            "slot_id": "video_main_video_0",
+            "type": "video",
+            "track_name": "main_video",
+            "segment_index": 0,
+        },
+        {
+            "slot_id": "bgm_bgm_track_0",
+            "type": "bgm",
+            "track_name": "bgm_track",
+            "segment_index": 0,
+        },
+    ]
+
+    from vectcut.features.template_filling.schemas import RenderDraftRequest
+
+    req = RenderDraftRequest(
+        template_id="tpl_duration_video_sum",
+        slot_values={
+            "video_main_video_0": {
+                "path": "/v.mp4",
+                "duration": 10.0,
+                "width": 1920,
+                "height": 1080,
+            },
+            "bgm_bgm_track_0": {"path": "/bgm.mp3", "duration": 5.0},
+        },
+        output_draft_name="out",
+    )
+
+    resp = service.render_draft("tpl_duration_video_sum", req)
+
+    assert any("BGM 时长 5.0s 过短" in w for w in resp.warnings)
+
+
+def test_render_draft_duration_alignment_prefers_audio_max_over_video_sum(
+    fake_storage, fake_draft_module, tmp_path: Path
+):
+    """无字幕且存在配音 audio 时，以 audio 最大时长作为 target。"""
+    zip_path = tmp_path / "src.zip"
+    zip_path.write_bytes(b"PK\x03\x04")
+    service.import_template("tpl_duration_audio_priority", str(zip_path))
+
+    fake_storage["slots"]["tpl_duration_audio_priority"] = [
+        {
+            "slot_id": "video_main_video_0",
+            "type": "video",
+            "track_name": "main_video",
+            "segment_index": 0,
+        },
+        {
+            "slot_id": "audio_voice_0",
+            "type": "audio",
+            "track_name": "bgm_track",
+            "segment_index": 0,
+        },
+    ]
+
+    from vectcut.features.template_filling.schemas import RenderDraftRequest
+
+    req = RenderDraftRequest(
+        template_id="tpl_duration_audio_priority",
+        slot_values={
+            "video_main_video_0": {
+                "path": "/v.mp4",
+                "duration": 1.5,
+                "width": 1920,
+                "height": 1080,
+            },
+            "audio_voice_0": {"path": "/voice.mp3", "duration": 4.0},
+        },
+        output_draft_name="out",
+    )
+
+    resp = service.render_draft("tpl_duration_audio_priority", req)
+
+    assert any("最后一段时长 1.5s 不自然" in w for w in resp.warnings)
+
+
+def test_render_draft_duration_alignment_uses_bgm_when_only_bgm(
+    fake_storage, fake_draft_module, tmp_path: Path
+):
+    """只有 BGM 时，以 BGM 最大时长作为 target，不产生自循环 warning。"""
+    zip_path = tmp_path / "src.zip"
+    zip_path.write_bytes(b"PK\x03\x04")
+    service.import_template("tpl_duration_bgm_only", str(zip_path))
+
+    fake_storage["slots"]["tpl_duration_bgm_only"] = [
+        {
+            "slot_id": "bgm_bgm_track_0",
+            "type": "bgm",
+            "track_name": "bgm_track",
+            "segment_index": 0,
+        },
+    ]
+
+    from vectcut.features.template_filling.schemas import RenderDraftRequest
+
+    req = RenderDraftRequest(
+        template_id="tpl_duration_bgm_only",
+        slot_values={
+            "bgm_bgm_track_0": {"path": "/bgm.mp3", "duration": 5.0},
+        },
+        output_draft_name="out",
+    )
+
+    resp = service.render_draft("tpl_duration_bgm_only", req)
+
+    assert resp.warnings == []
+
+
+def test_render_draft_video_duration_alignment_uses_slot_config_order(
+    fake_storage, fake_draft_module, monkeypatch, tmp_path: Path
+):
+    """视频循环预检按槽位配置顺序取最后一段，不依赖请求 JSON key 顺序。"""
+    zip_path = tmp_path / "src.zip"
+    zip_path.write_bytes(b"PK\x03\x04")
+    service.import_template("tpl_duration_video_order", str(zip_path))
+
+    fake_storage["slots"]["tpl_duration_video_order"] = [
+        {
+            "slot_id": "video_main_video_0",
+            "type": "video",
+            "track_name": "main_video",
+            "segment_index": 0,
+        },
+        {
+            "slot_id": "video_main_video_1",
+            "type": "video",
+            "track_name": "main_video",
+            "segment_index": 1,
+        },
+        {
+            "slot_id": "subtitle_sub_0",
+            "type": "subtitle",
+            "track_name": "subtitle_track",
+            "segment_index": 0,
+        },
+    ]
+    custom_tracks = [
+        _make_track(_FakeTrackType("video"), "main_video", seg_count=2),
+        _make_track(_FakeTrackType("text"), "subtitle_track", seg_count=1),
+    ]
+
+    monkeypatch.setattr(
+        service.draft.Script_file,
+        "load_template",
+        lambda _path: _make_fake_script(custom_tracks),
+    )
+
+    from vectcut.features.template_filling.schemas import RenderDraftRequest
+
+    req = RenderDraftRequest(
+        template_id="tpl_duration_video_order",
+        slot_values={
+            "video_main_video_1": {
+                "path": "/tail.mp4",
+                "duration": 1.5,
+                "width": 1920,
+                "height": 1080,
+            },
+            "video_main_video_0": {
+                "path": "/head.mp4",
+                "duration": 10.0,
+                "width": 1920,
+                "height": 1080,
+            },
+            "subtitle_sub_0": {
+                "srt_content": "1\n00:00:00,000 --> 00:00:13,000\nhi\n",
+            },
+        },
+        output_draft_name="out",
+    )
+
+    resp = service.render_draft("tpl_duration_video_order", req)
+
+    assert any("最后一段时长 1.5s 不自然" in w for w in resp.warnings)
 
 
 @pytest.mark.parametrize(
@@ -1382,3 +1812,55 @@ def test_scan_slots_classifies_track_types():
     assert video_slot["slot_id"] == "video_main_video_0"
     assert video_slot["segment_index"] == 0
     assert video_slot["name"] == "video槽位0"
+
+
+def test_scan_slots_reads_imported_tracks_when_tracks_is_empty():
+    """真实 pyJianYingDraft load_template 会把导入轨道放在 imported_tracks。"""
+    imported_tracks = [
+        _make_track(_FakeTrackType("video"), "real_video", seg_count=2),
+        _make_track(_FakeTrackType("audio"), "real_bgm", seg_count=1),
+        _make_track(_FakeTrackType("text"), "real_subtitle", seg_count=1),
+    ]
+    script = SimpleNamespace(tracks=[], imported_tracks=imported_tracks)
+
+    slots = service._scan_slots_from_template(script)
+
+    assert [s["slot_id"] for s in slots] == [
+        "video_real_video_0",
+        "video_real_video_1",
+        "bgm_real_bgm_0",
+        "subtitle_real_subtitle_0",
+    ]
+
+
+def test_scan_slots_accepts_tracks_dict_values():
+    """真实 Script_file.tracks 可能是 dict，应扫描 values 而不是 dict key。"""
+    tracks = {
+        "video": _make_track(_FakeTrackType("video"), "dict_video", seg_count=1),
+        "subtitle": _make_track(_FakeTrackType("text"), "dict_subtitle", seg_count=1),
+    }
+    script = SimpleNamespace(tracks=tracks, imported_tracks=[])
+
+    slots = service._scan_slots_from_template(script)
+
+    assert [s["slot_id"] for s in slots] == [
+        "video_dict_video_0",
+        "subtitle_dict_subtitle_0",
+    ]
+
+
+def test_scan_slots_deduplicates_tracks_and_imported_tracks():
+    """同一轨道同时出现在 tracks/imported_tracks 时不得重复生成槽位。"""
+    shared_track = _make_track(_FakeTrackType("video"), "shared_video", seg_count=1)
+    same_name_track = _make_track(_FakeTrackType("audio"), "shared_bgm", seg_count=1)
+    script = SimpleNamespace(
+        tracks=[shared_track, same_name_track],
+        imported_tracks=[shared_track, same_name_track],
+    )
+
+    slots = service._scan_slots_from_template(script)
+
+    assert [s["slot_id"] for s in slots] == [
+        "video_shared_video_0",
+        "bgm_shared_bgm_0",
+    ]
