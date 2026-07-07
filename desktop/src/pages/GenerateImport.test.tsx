@@ -17,4 +17,10 @@ describe('GenerateImport error dialog integration', () => {
     expect(generateImportSource).toContain('<ErrorDialog');
     expect(generateImportSource).toContain('toApiError(caught)');
   });
+
+  it('passes media, subtitles, and cover titles to renderDraft', () => {
+    expect(generateImportSource).toContain('subtitles');
+    expect(generateImportSource).toContain('coverTitles');
+    expect(generateImportSource).toContain('renderDraft(templateId, materials, subtitles, coverTitles)');
+  });
 });

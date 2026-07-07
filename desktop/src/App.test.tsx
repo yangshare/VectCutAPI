@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import App from './App';
+import App, { getStartupJianyingVersionWarning } from './App';
+import appSource from './App.tsx?raw';
 import generateImportSource from './pages/GenerateImport.tsx?raw';
 
 describe('App', () => {
@@ -31,5 +32,29 @@ describe('App', () => {
     expect(generateImportSource).not.toContain(`node:${osModule}`);
     expect(generateImportSource).not.toContain(`import ${osModule}`);
     expect(generateImportSource).not.toContain(`${processToken}.`);
+  });
+
+  it('keeps subtitles and cover titles in the material fill result through the wizard', () => {
+    expect(appSource).toContain('MaterialFillResult');
+    expect(appSource).toContain('setMaterialFillResult');
+    expect(appSource).toContain('subtitles={materialFillResult.subtitles}');
+    expect(appSource).toContain('coverTitles={materialFillResult.coverTitles}');
+  });
+
+  it('checks Jianying version on startup without blocking the wizard', () => {
+    expect(appSource).toContain("from 'react'");
+    expect(appSource).toContain('detectJianyingVersion');
+    expect(appSource).toContain('window.vectcut?.detectJianyingVersion');
+    expect(appSource).not.toContain('window.vectcut.detectJianyingVersion()');
+    expect(appSource).toContain('getStartupJianyingVersionWarning(startupJianyingVersion)');
+    expect(appSource).toContain('TemplateManager onTemplateImported={handleTemplateImported}');
+  });
+
+  it('builds a startup warning for unsupported Jianying versions', () => {
+    expect(getStartupJianyingVersionWarning('10.8.0')).toBeNull();
+    expect(getStartupJianyingVersionWarning('10.9.beta')).toBe(
+      '当前仅支持剪映专业版 10.0-10.9，检测到 10.9.beta，生成草稿可能无法打开。',
+    );
+    expect(getStartupJianyingVersionWarning(null)).toBeNull();
   });
 });

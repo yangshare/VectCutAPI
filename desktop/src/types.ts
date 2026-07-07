@@ -1,7 +1,9 @@
 /** 槽位（后端 import_template 返回） */
+export type SlotType = 'video' | 'audio' | 'bgm' | 'subtitle' | 'cover_image' | 'cover_title';
+
 export interface Slot {
   slot_id: string;
-  type: 'video' | 'audio' | 'bgm' | 'subtitle';
+  type: SlotType;
   track_name: string;
   segment_index: number;
 }
@@ -25,6 +27,13 @@ export interface SubtitleMetadata {
 export interface CoverTitleMetadata {
   slot_id: string;
   text: string;
+}
+
+/** 素材填充步骤输出 */
+export interface MaterialFillResult {
+  materials: MaterialMetadata[];
+  subtitles: SubtitleMetadata[];
+  coverTitles: CoverTitleMetadata[];
 }
 
 /** 槽位配置（保存到云端） */
@@ -70,6 +79,7 @@ export interface VectCutApi {
   importDraftToJianying: (zipPath: string) => Promise<{ draftDir: string }>;
   packTemplateFolder: (folderPath: string) => Promise<{ zipPath: string; sizeMB: number }>;
   readZipFile: (filePath: string) => Promise<ArrayBuffer>;
+  readTextFile: (filePath: string) => Promise<string>;
   writeZipFile: (savePath: string, data: ArrayBuffer) => Promise<void>;
   getUserConfig: () => Promise<UserConfig>;
   setUserConfig: (config: Partial<UserConfig>) => Promise<UserConfig>;

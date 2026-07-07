@@ -159,9 +159,12 @@ describe('api client', () => {
 
     const result = await renderDraft(
       'tpl-1',
-      [{ slot_id: 'video-1', path: 'D:\\media\\v.mp4', duration: 10 }],
+      [
+        { slot_id: 'video-1', path: 'D:\\media\\v.mp4', duration: 10 },
+        { slot_id: 'cover_image_1', path: 'D:\\media\\cover.png', width: 1280, height: 720 },
+      ],
       [{ slot_id: 'subtitle_1', srt_content: '1\n00:00:00,000 --> 00:00:01,000\nHi' }],
-      { slot_id: 'cover_title_1', text: '标题' },
+      [{ slot_id: 'cover_title_1', text: '标题' }],
     );
 
     expect(result).toEqual({
@@ -180,6 +183,12 @@ describe('api client', () => {
       template_id: 'tpl-1',
       slot_values: {
         'video-1': { slot_id: 'video-1', path: 'D:\\media\\v.mp4', duration: 10 },
+        cover_image_1: {
+          slot_id: 'cover_image_1',
+          path: 'D:\\media\\cover.png',
+          width: 1280,
+          height: 720,
+        },
         subtitle_1: {
           slot_id: 'subtitle_1',
           srt_content: '1\n00:00:00,000 --> 00:00:01,000\nHi',
@@ -419,6 +428,8 @@ describe('api client', () => {
     expect(source).toContain('srt_content: string;');
     expect(source).toContain('export interface CoverTitleMetadata');
     expect(source).toContain('text: string;');
+    expect(source).toContain('cover_image');
+    expect(source).toContain('cover_title');
     expect(source).not.toContain('start_time: number;');
     expect(source).not.toContain('end_time: number;');
     expect(source).not.toContain('title: string;');

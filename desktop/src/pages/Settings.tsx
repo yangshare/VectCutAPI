@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
 import { formatUserFacingError } from '../api/errorMessages';
+import { getUnsupportedJianyingVersionMessage } from '../utils/jianyingVersion';
+
+export {
+  getUnsupportedJianyingVersionMessage,
+  isJianyingVersionSupported,
+} from '../utils/jianyingVersion';
 
 const DEFAULT_SERVER_URL = 'https://api.vectcut.com';
 
@@ -120,6 +126,7 @@ export default function Settings({ onClose }: SettingsProps) {
     : connectionState === 'failure'
       ? errorStyle
       : noteStyle;
+  const unsupportedJianyingVersionMessage = getUnsupportedJianyingVersionMessage(jianyingVersion);
 
   return (
     <section aria-labelledby="settings-title" style={{ display: 'grid', gap: 16 }}>
@@ -176,6 +183,11 @@ export default function Settings({ onClose }: SettingsProps) {
           <span style={{ color: '#475569' }}>
             剪映版本：{jianyingVersion || '未检测到'}
           </span>
+          {unsupportedJianyingVersionMessage ? (
+            <p role="alert" style={errorStyle}>
+              {unsupportedJianyingVersionMessage}
+            </p>
+          ) : null}
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>

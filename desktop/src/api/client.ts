@@ -250,14 +250,14 @@ export async function renderDraft(
   templateId: string,
   materials: MaterialMetadata[],
   subtitles?: SubtitleMetadata[],
-  cover?: CoverTitleMetadata,
+  coverTitles?: CoverTitleMetadata[],
 ): Promise<RenderDraftResult> {
   const output = await requestEnvelope<RenderDraftBackendResult>({
     method: 'post',
     url: '/api/template/render',
     data: {
       template_id: templateId,
-      slot_values: buildSlotValues(materials, subtitles, cover),
+      slot_values: buildSlotValues(materials, subtitles, coverTitles),
       output_draft_name: `${templateId}-${Date.now()}`,
     },
   });
@@ -337,7 +337,7 @@ export async function downloadDraft(taskId: string, savePath: string): Promise<s
 function buildSlotValues(
   materials: MaterialMetadata[],
   subtitles?: SubtitleMetadata[],
-  cover?: CoverTitleMetadata,
+  coverTitles?: CoverTitleMetadata[],
 ): Record<string, unknown> {
   const values: Record<string, unknown> = {};
 
@@ -349,8 +349,8 @@ function buildSlotValues(
     values[subtitle.slot_id] = subtitle;
   }
 
-  if (cover) {
-    values[cover.slot_id] = cover;
+  for (const coverTitle of coverTitles ?? []) {
+    values[coverTitle.slot_id] = coverTitle;
   }
 
   return values;

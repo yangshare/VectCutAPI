@@ -1,38 +1,78 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Stepper from './components/Stepper';
 import GenerateImport from './pages/GenerateImport';
 import MaterialFill from './pages/MaterialFill';
 import Settings from './pages/Settings';
 import SlotConfig from './pages/SlotConfig';
 import TemplateManager from './pages/TemplateManager';
-import type { MaterialMetadata, Slot } from './types';
+import type { MaterialFillResult, Slot } from './types';
+import { getUnsupportedJianyingVersionMessage } from './utils/jianyingVersion';
 
 const STEPS = ['导入母版', '槽位配置', '素材填充', '生成导入'];
+
+function createEmptyMaterialFillResult(): MaterialFillResult {
+  return { materials: [], subtitles: [], coverTitles: [] };
+}
+
+export function getStartupJianyingVersionWarning(version: string | null): string | null {
+  return getUnsupportedJianyingVersionMessage(version ?? '');
+}
 
 export default function App() {
   const [step, setStep] = useState(0);
   const [templateId, setTemplateId] = useState('');
   const [slots, setSlots] = useState<Slot[]>([]);
   const [selectedSlots, setSelectedSlots] = useState<Slot[]>([]);
-  const [materials, setMaterials] = useState<MaterialMetadata[]>([]);
+  const [materialFillResult, setMaterialFillResult] = useState<MaterialFillResult>(
+    createEmptyMaterialFillResult,
+  );
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [startupJianyingVersion, setStartupJianyingVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const detectJianyingVersion = window.vectcut?.detectJianyingVersion;
+
+    if (!detectJianyingVersion) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    Promise.resolve()
+      .then(() => detectJianyingVersion())
+      .then((detectedVersion) => {
+        if (isMounted) {
+          setStartupJianyingVersion(detectedVersion);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setStartupJianyingVersion(null);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   function handleTemplateImported(importedTemplateId: string, importedSlots: Slot[]) {
     setTemplateId(importedTemplateId);
     setSlots(importedSlots);
     setSelectedSlots([]);
-    setMaterials([]);
+    setMaterialFillResult(createEmptyMaterialFillResult());
     setStep(1);
   }
 
   function handleConfigSaved(selected: Slot[]) {
     setSelectedSlots(selected);
-    setMaterials([]);
+    setMaterialFillResult(createEmptyMaterialFillResult());
     setStep(2);
   }
 
-  function handleMaterialsReady(readyMaterials: MaterialMetadata[]) {
-    setMaterials(readyMaterials);
+  function handleMaterialsReady(result: MaterialFillResult) {
+    setMaterialFillResult(result);
     setStep(3);
   }
 
@@ -41,7 +81,7 @@ export default function App() {
     setTemplateId('');
     setSlots([]);
     setSelectedSlots([]);
-    setMaterials([]);
+    setMaterialFillResult(createEmptyMaterialFillResult());
   }
 
   function handleStepClick(idx: number) {
@@ -49,6 +89,8 @@ export default function App() {
       setStep(idx);
     }
   }
+
+  const startupJianyingVersionWarning = getStartupJianyingVersionWarning(startupJianyingVersion);
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', color: '#0f172a', fontFamily: 'system-ui, sans-serif' }}>
@@ -59,6 +101,11 @@ export default function App() {
             <p style={{ margin: 0, color: '#475569' }}>
               按步骤导入剪映母版、选择槽位、填充素材并生成可导入草稿。
             </p>
+            {startupJianyingVersionWarning ? (
+              <p role="alert" style={versionWarningStyle}>
+                {startupJianyingVersionWarning}
+              </p>
+            ) : null}
           </div>
           <button type="button" onClick={() => setIsSettingsOpen(true)} style={settingsButtonStyle}>
             设置
@@ -82,7 +129,13 @@ export default function App() {
                 <MaterialFill slots={selectedSlots} onMaterialsReady={handleMaterialsReady} />
               ) : null}
               {step === 3 ? (
-                <GenerateImport templateId={templateId} materials={materials} onRestart={handleRestart} />
+                <GenerateImport
+                  templateId={templateId}
+                  materials={materialFillResult.materials}
+                  subtitles={materialFillResult.subtitles}
+                  coverTitles={materialFillResult.coverTitles}
+                  onRestart={handleRestart}
+                />
               ) : null}
             </>
           )}
@@ -101,4 +154,14 @@ const settingsButtonStyle = {
   color: '#0f172a',
   font: 'inherit',
   cursor: 'pointer',
+} satisfies React.CSSProperties;
+
+const versionWarningStyle = {
+  margin: 0,
+  padding: 10,
+  border: '1px solid #fecaca',
+  borderRadius: 6,
+  background: '#fef2f2',
+  color: '#991b1b',
+  whiteSpace: 'pre-wrap',
 } satisfies React.CSSProperties;

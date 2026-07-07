@@ -2,7 +2,17 @@ import { mkdir, mkdtemp, writeFile } from 'fs/promises';
 import os from 'os';
 import { join } from 'path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getConfiguredOrDetectedDraftDir, importDraft, isVersionSupported } from '../../electron/ipc/jianyingDir';
+import {
+  detectVersion,
+  detectVersionFromAppsDir,
+  getConfiguredOrDetectedDraftDir,
+  importDraft,
+  isVersionSupported,
+  parseJianyingVersionFromIni,
+  parseJianyingVersionFromPacketXml,
+  parseVersionFromInfoPlist,
+  selectLatestVersion,
+} from '../../electron/ipc/jianyingDir';
 
 const { execFileMock } = vi.hoisted(() => ({
   execFileMock: vi.fn((_file, _args, callback) => callback(null, '', '')),
@@ -13,14 +23,158 @@ vi.mock('child_process', () => ({
 }));
 
 describe('isVersionSupported', () => {
-  it.each(['10.0.0', '10.5.3', '10.9.9', '10.9.10'])('supports %s', (version) => {
+  it.each(['10.0.0', '10.5.3', '10.9.9', '10.9.10', '10.9.0.12345'])('supports %s', (version) => {
     expect(isVersionSupported(version)).toBe(true);
   });
 
-  it.each(['11.0.0', '9.8.0', '10.10.0', 'abc', ''])('rejects %s', (version) => {
+  it.each(['11.0.0', '9.8.0', '10.10.0', '10.9.beta', '10.9.', '10.9', 'abc', ''])('rejects %s', (version) => {
     expect(isVersionSupported(version)).toBe(false);
   });
 });
+
+describe('Jianying version discovery', () => {
+  it('parses last_version from Configure.ini', () => {
+    expect(parseJianyingVersionFromIni('[jianyingpro]\nlast_version=8.9.0.13361\n')).toBe('8.9.0.13361');
+  });
+
+  it('parses full_appver from packet XML before appver', () => {
+    expect(parseJianyingVersionFromPacketXml(`
+      <root>
+        <appver value="8.9.0" />
+        <full_appver value="8.9.0.13361" />
+      </root>
+    `)).toBe('8.9.0.13361');
+  });
+
+  it('treats malformed ini and XML versions as parse failures', () => {
+    expect(parseJianyingVersionFromIni('[jianyingpro]\nlast_version=not-a-version\n')).toBeNull();
+    expect(parseJianyingVersionFromPacketXml('<full_appver value="not-a-version" /><appver value="also-bad" />')).toBeNull();
+  });
+
+  it('falls back to CFBundleVersion when CFBundleShortVersionString is malformed', () => {
+    expect(parseVersionFromInfoPlist(`
+      <plist>
+        <dict>
+          <key>CFBundleShortVersionString</key>
+          <string>10.9.beta</string>
+          <key>CFBundleVersion</key>
+          <string>10.9.0.12345</string>
+        </dict>
+      </plist>
+    `)).toBe('10.9.0.12345');
+  });
+
+  it('returns null when all Info.plist version fields are malformed', () => {
+    expect(parseVersionFromInfoPlist(`
+      <plist>
+        <dict>
+          <key>CFBundleShortVersionString</key>
+          <string>10.9.beta</string>
+          <key>CFBundleVersion</key>
+          <string>10.9.</string>
+        </dict>
+      </plist>
+    `)).toBeNull();
+  });
+
+  it('selects the latest semantic version from directory names', () => {
+    expect(selectLatestVersion(['10.0.9', '10.9.10', '10.10.0', 'not-a-version', '9.9.99'])).toBe('10.10.0');
+  });
+
+  it('detects version from Apps dir with ini before XML before directory fallback', async () => {
+    const appsDir = await mkdtemp(join(os.tmpdir(), 'jianying-apps-'));
+    await mkdir(join(appsDir, '10.8.0.1'));
+    await writeFile(join(appsDir, 'JianyingProPacket.xml'), '<appver value="10.7.0" /><full_appver value="10.7.0.999" />');
+    await writeFile(join(appsDir, 'Configure.ini'), '[jianyingpro]\nlast_version=10.6.0.123\n');
+
+    await expect(detectVersionFromAppsDir(appsDir)).resolves.toBe('10.6.0.123');
+  });
+
+  it('falls back from XML to version directories', async () => {
+    const xmlAppsDir = await mkdtemp(join(os.tmpdir(), 'jianying-apps-'));
+    await writeFile(join(xmlAppsDir, 'JianyingProPacket.xml'), '<appver value="10.7.0" /><full_appver value="10.7.0.999" />');
+    await mkdir(join(xmlAppsDir, '10.8.0.1'));
+
+    await expect(detectVersionFromAppsDir(xmlAppsDir)).resolves.toBe('10.7.0.999');
+
+    const dirAppsDir = await mkdtemp(join(os.tmpdir(), 'jianying-apps-'));
+    await mkdir(join(dirAppsDir, '10.7.9'));
+    await mkdir(join(dirAppsDir, '10.8.0.1'));
+
+    await expect(detectVersionFromAppsDir(dirAppsDir)).resolves.toBe('10.8.0.1');
+  });
+
+  it('falls back when higher-priority version files are malformed', async () => {
+    const appsDir = await mkdtemp(join(os.tmpdir(), 'jianying-apps-'));
+    await writeFile(join(appsDir, 'Configure.ini'), '[jianyingpro]\nlast_version=not-a-version\n');
+    await writeFile(join(appsDir, 'JianyingProPacket.xml'), '<full_appver value="bad" /><appver value="10.7.0" />');
+
+    await expect(detectVersionFromAppsDir(appsDir)).resolves.toBe('10.7.0');
+  });
+
+  it('returns null when no version source exists', async () => {
+    const appsDir = await mkdtemp(join(os.tmpdir(), 'jianying-apps-'));
+
+    await expect(detectVersionFromAppsDir(appsDir)).resolves.toBeNull();
+  });
+
+  it('detectVersion reads LOCALAPPDATA instead of returning the old fixed placeholder', async () => {
+    const localAppData = await mkdtemp(join(os.tmpdir(), 'jianying-local-'));
+    const previousLocalAppData = process.env.LOCALAPPDATA;
+    const restorePlatform = stubProcessPlatform('win32');
+    process.env.LOCALAPPDATA = localAppData;
+    const appsDir = join(localAppData, 'JianyingPro', 'Apps');
+    await mkdir(appsDir, { recursive: true });
+    await writeFile(join(appsDir, 'Configure.ini'), '[jianyingpro]\nlast_version=10.8.0.2468\n');
+
+    try {
+      await expect(detectVersion()).resolves.toBe('10.8.0.2468');
+    } finally {
+      restoreLocalAppData(previousLocalAppData);
+      restorePlatform();
+    }
+  });
+
+  it('does not read Windows LOCALAPPDATA version sources on non-Windows platforms', async () => {
+    const localAppData = await mkdtemp(join(os.tmpdir(), 'jianying-local-'));
+    const previousLocalAppData = process.env.LOCALAPPDATA;
+    const restorePlatform = stubProcessPlatform('linux');
+    process.env.LOCALAPPDATA = localAppData;
+    const appsDir = join(localAppData, 'JianyingPro', 'Apps');
+    await mkdir(appsDir, { recursive: true });
+    await writeFile(join(appsDir, 'Configure.ini'), '[jianyingpro]\nlast_version=10.8.0.2468\n');
+
+    try {
+      await expect(detectVersion()).resolves.toBeNull();
+    } finally {
+      restoreLocalAppData(previousLocalAppData);
+      restorePlatform();
+    }
+  });
+});
+
+function restoreLocalAppData(previousValue: string | undefined): void {
+  if (previousValue === undefined) {
+    delete process.env.LOCALAPPDATA;
+    return;
+  }
+
+  process.env.LOCALAPPDATA = previousValue;
+}
+
+function stubProcessPlatform(platform: NodeJS.Platform): () => void {
+  const descriptor = Object.getOwnPropertyDescriptor(process, 'platform');
+  Object.defineProperty(process, 'platform', {
+    configurable: true,
+    value: platform,
+  });
+
+  return () => {
+    if (descriptor) {
+      Object.defineProperty(process, 'platform', descriptor);
+    }
+  };
+}
 
 describe('importDraft', () => {
   beforeEach(() => {

@@ -84,6 +84,11 @@ describe('preload controlled IPC API', () => {
       expectedInvokeArgs: ['file:readZip', 'C:/templates/template-a.zip'],
     },
     {
+      method: 'readTextFile',
+      args: ['C:/subtitles/intro.srt'],
+      expectedInvokeArgs: ['file:readText', 'C:/subtitles/intro.srt'],
+    },
+    {
       method: 'writeZipFile',
       args: ['C:/downloads/draft.zip', new ArrayBuffer(2)],
       expectedInvokeArgs: ['file:writeZip', 'C:/downloads/draft.zip', new ArrayBuffer(2)],
@@ -120,6 +125,7 @@ describe('preload controlled IPC API', () => {
       'importDraftToJianying',
       'packTemplateFolder',
       'probeMedia',
+      'readTextFile',
       'readZipFile',
       'selectAudioFile',
       'selectImageFile',

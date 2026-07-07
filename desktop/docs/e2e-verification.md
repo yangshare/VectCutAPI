@@ -4,7 +4,7 @@
 
 - **任务：** Solution2 Task 12，全量测试 + 端到端验收。
 - **基线提交：** `70992cba0a99295ad627e582da4ba818abc1c5e4`。
-- **执行日期：** 2026-07-06。
+- **执行日期：** 2026-07-06；Windows 打包复验：2026-07-07。
 - **执行范围：** `desktop` 自动化测试、TypeScript 类型检查、构建产物检查、Windows 打包尝试，以及端到端人工联调清单记录。
 - **结论口径：** 没有真实后端、剪映专业版和真实样例草稿参与的项目，统一标记为“未执行/需人工联调”，不视为端到端通过。
 
@@ -19,9 +19,10 @@
 | 5 | Node/Electron TypeScript 类型检查 | `npx tsc --noEmit -p tsconfig.node.json` | 已执行 | 通过；已将 Node/Electron 类型检查切换为 `module: "ESNext"`、`moduleResolution: "bundler"`，并补充 `ffprobe-static` 声明。 |
 | 6 | 构建验证 | `npm run build` | 已执行 | 通过，electron-vite 成功构建 main、preload、renderer。 |
 | 7 | 构建输出目录检查 | `out/main`、`out/preload`、`out/renderer` | 已执行 | 三个目录均存在。 |
-| 8 | Windows 打包验证 | `npm run pack:win` | 未通过/外部阻塞 | 首次执行时 electron-builder 打包到 `dist/win-unpacked` 阶段，请求 `20.205.243.166:443` 超时，原始错误为 `connect ETIMEDOUT 20.205.243.166:443`；本轮重试 604 秒后命令超时终止，未生成可验收的 `.exe` 安装包。 |
-| 9 | Diff 空白检查 | `git diff --check 70992cba0a99295ad627e582da4ba818abc1c5e4..HEAD` | 已执行 | 提交前执行无输出；提交后需再次以新 HEAD 复核。 |
-| 10 | 工作树检查 | `git status --short --branch` | 已执行 | 当前分支 `dev`，提交前改动限定在验收报告、验收测试、TypeScript 声明和 `tsconfig.node.json`。 |
+| 8 | Electron 依赖收敛 | `npm install --offline --save-dev electron@29.4.6` | 已执行 | 使用 npm 缓存中的 `electron-29.4.6.tgz` 和 `%LOCALAPPDATA%\electron\Cache\electron-v29.4.6-win32-x64.zip`，将 Electron 从 43.0.0 收敛到满足 Electron 28+ 要求的 29.4.6；`node_modules/electron/dist/electron.exe` 已生成。 |
+| 9 | Windows 打包验证 | `npm run pack:win` | 已执行 | 通过，生成 `dist/VectCut 模板套版-Setup-1.0.0-x64.exe` 和 `dist/VectCut 模板套版-Portable-1.0.0-x64.exe`。 |
+| 10 | Diff 空白检查 | `git diff --check -- package.json package-lock.json docs/e2e-verification.md` | 已执行 | 无空白错误；Git 仅提示这些文本文件下次触碰时会进行 LF/CRLF 转换。 |
+| 11 | 工作树检查 | `git status --short` | 已执行 | 工作树已有任务 A/B 未提交改动；本轮 Windows 打包复验改动限定在 `package.json`、`package-lock.json` 和 `docs/e2e-verification.md`。 |
 
 ## Task 12 端到端验收清单
 
@@ -36,7 +37,7 @@
 | 时长对齐正确（配音基准） | 未执行/需人工联调 | 缺失条件：包含配音基准的真实用例，以及后端生成结果。 |
 | 服务器地址可在设置页配置 + 测试连接 | 未执行/需人工联调 | 缺失条件：客户端开发窗口和可访问的后端服务。 |
 | 错误信息用户友好（不出现技术术语给最终用户） | 未执行/需人工联调 | 缺失条件：人工触发网络失败、素材缺失、后端失败等路径并检查 UI 文案。 |
-| Windows 可打包为 .exe 安装包 | 未通过/外部阻塞 | 已尝试 `npm run pack:win`，首次执行因连接 `20.205.243.166:443` 超时失败，本轮重试 604 秒后命令超时终止，未生成可验收的 `.exe` 安装包。 |
+| Windows 可打包为 .exe 安装包 | 已执行 | 2026-07-07 复验通过，`npm run pack:win` 生成安装包 `dist/VectCut 模板套版-Setup-1.0.0-x64.exe` 和便携版 `dist/VectCut 模板套版-Portable-1.0.0-x64.exe`。 |
 | 安装指南含 SmartScreen 绕过说明 | 已自动化覆盖 | `desktop/tests/packaging-config.test.ts` 检查 `desktop/docs/install-guide.md` 包含 SmartScreen、更多信息、仍要运行等说明。 |
 
 ## 规格 §18.4 MVP 验收清单
@@ -100,7 +101,6 @@ npm run dev
 
 以下项目不能仅凭当前自动化命令判定通过：
 
-- Windows `.exe` 打包因 electron-builder 外部网络请求超时或长时间无结果未完成，需在网络可访问依赖下载源后重跑 `npm run pack:win`。
 - 后端 `python run_http.py` 是否在本机成功启动，并能完成上传、生成、轮询、下载接口链路。
 - 客户端 `npm run dev` 的真实 Electron 窗口交互。
 - 真实剪映草稿导入、生成草稿在剪映专业版内打开。

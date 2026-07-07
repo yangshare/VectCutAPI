@@ -16,6 +16,7 @@ vi.mock('electron', () => ({
 }));
 
 import {
+  readTextFile,
   readZipFile,
   registerDialogHandlers,
   selectJianyingDraftDir,
@@ -49,7 +50,7 @@ describe('registerDialogHandlers', () => {
 
     registerDialogHandlers(ipcMain as never);
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(9);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(10);
     expect(ipcMain.handle.mock.calls.map(([channel]) => channel)).toEqual([
       'dialog:selectVideoFile',
       'dialog:selectAudioFile',
@@ -59,6 +60,7 @@ describe('registerDialogHandlers', () => {
       'dialog:selectJianyingDraftDir',
       'dialog:selectDraftSavePath',
       'file:readZip',
+      'file:readText',
       'file:writeZip',
     ]);
   });
@@ -71,10 +73,17 @@ describe('registerDialogHandlers', () => {
   ])('opens %s with the expected file filter', async (channel, name, extensions) => {
     const { ipcMain, handlers } = createFakeIpcMain();
     const selectedPath = join(os.tmpdir(), 'selected-file');
+    if (channel === 'dialog:selectSrtFile') {
+      await writeFile(selectedPath, '', 'utf8');
+    }
     showOpenDialogMock.mockResolvedValue({ canceled: false, filePaths: [selectedPath] });
     registerDialogHandlers(ipcMain as never);
 
-    await expect(handlers.get(channel)?.()).resolves.toBe(selectedPath);
+    try {
+      await expect(handlers.get(channel)?.()).resolves.toBe(selectedPath);
+    } finally {
+      await rm(selectedPath, { force: true });
+    }
 
     expect(showOpenDialogMock).toHaveBeenCalledWith({
       title: `选择${name}`,
@@ -322,5 +331,107 @@ describe('readZipFile', () => {
 
     expect(Buffer.isBuffer(result)).toBe(true);
     expect([...Buffer.from(result as Buffer)]).toEqual([0x50, 0x4b]);
+  });
+});
+
+describe('readTextFile', () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(os.tmpdir(), 'dialog-read-text-'));
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it.each(['', '   ', null, { path: 'intro.srt' }])(
+    'rejects an invalid text path before reading %#',
+    async (filePath) => {
+      await expect(readTextFile(filePath as unknown as string)).rejects.toThrow(
+        '文本文件路径不能为空',
+      );
+    },
+  );
+
+  it('rejects a non-existent text file with a clear message', async () => {
+    const filePath = join(tempDir, 'missing.srt');
+
+    await expect(readTextFile(filePath)).rejects.toThrow(`文本文件不存在：${filePath}`);
+  });
+
+  it('rejects a directory path', async () => {
+    const filePath = join(tempDir, 'intro.srt');
+    await mkdir(filePath);
+
+    await expect(readTextFile(filePath)).rejects.toThrow(`文本路径不是文件：${filePath}`);
+  });
+
+  it('rejects files outside the subtitle text allowlist', async () => {
+    const filePath = join(tempDir, 'intro.md');
+    await writeFile(filePath, 'not allowed');
+
+    await expect(readTextFile(filePath)).rejects.toThrow('仅支持 .srt/.txt 文件');
+  });
+
+  it('rejects an allowlisted text file that was not selected through the dialog', async () => {
+    const filePath = join(tempDir, 'intro.srt');
+    await writeFile(filePath, 'selected content', 'utf8');
+
+    await expect(readTextFile(filePath)).rejects.toThrow('文本文件路径未授权');
+  });
+
+  it('rejects text files larger than the size limit', async () => {
+    const { ipcMain, handlers } = createFakeIpcMain();
+    const filePath = join(tempDir, 'intro.srt');
+    await writeFile(filePath, Buffer.from([1, 2, 3, 4]));
+    showOpenDialogMock.mockResolvedValue({ canceled: false, filePaths: [filePath] });
+    registerDialogHandlers(ipcMain as never);
+
+    await handlers.get('dialog:selectSrtFile')?.();
+
+    await expect(readTextFile(filePath, 3)).rejects.toThrow('文本文件过大');
+  });
+
+  it('returns UTF-8 content for valid subtitle text', async () => {
+    const { ipcMain, handlers } = createFakeIpcMain();
+    const filePath = join(tempDir, 'intro.srt');
+    await writeFile(filePath, '1\n00:00:00,000 --> 00:00:01,000\n你好', 'utf8');
+    showOpenDialogMock.mockResolvedValue({ canceled: false, filePaths: [filePath] });
+    registerDialogHandlers(ipcMain as never);
+
+    await handlers.get('dialog:selectSrtFile')?.();
+
+    await expect(readTextFile(filePath)).resolves.toBe(
+      '1\n00:00:00,000 --> 00:00:01,000\n你好',
+    );
+  });
+
+  it('routes file:readText through the subtitle text reader', async () => {
+    const { ipcMain, handlers } = createFakeIpcMain();
+    const filePath = join(tempDir, 'intro.txt');
+    await writeFile(filePath, 'plain subtitle text', 'utf8');
+    showOpenDialogMock.mockResolvedValue({ canceled: false, filePaths: [filePath] });
+    registerDialogHandlers(ipcMain as never);
+
+    await handlers.get('dialog:selectSrtFile')?.();
+
+    await expect(handlers.get('file:readText')?.(undefined, filePath)).resolves.toBe(
+      'plain subtitle text',
+    );
+  });
+
+  it('authorizes a selected subtitle path once and consumes the authorization after reading', async () => {
+    const { ipcMain, handlers } = createFakeIpcMain();
+    const filePath = join(tempDir, 'once.srt');
+    await writeFile(filePath, 'one shot', 'utf8');
+    showOpenDialogMock.mockResolvedValue({ canceled: false, filePaths: [filePath] });
+    registerDialogHandlers(ipcMain as never);
+
+    await expect(handlers.get('dialog:selectSrtFile')?.()).resolves.toBe(filePath);
+    await expect(handlers.get('file:readText')?.(undefined, filePath)).resolves.toBe('one shot');
+    await expect(handlers.get('file:readText')?.(undefined, filePath)).rejects.toThrow(
+      '文本文件路径未授权',
+    );
   });
 });

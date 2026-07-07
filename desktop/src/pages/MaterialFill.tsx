@@ -1,11 +1,22 @@
 import { useState } from 'react';
 import { formatUserFacingError } from '../api/errorMessages';
-import type { MaterialMetadata, ProbeResult, Slot } from '../types';
+import type {
+  CoverTitleMetadata,
+  MaterialFillResult,
+  MaterialMetadata,
+  ProbeResult,
+  Slot,
+  SubtitleMetadata,
+} from '../types';
 
 interface MaterialFillProps {
   slots: Slot[];
-  onMaterialsReady: (materials: MaterialMetadata[]) => void;
+  onMaterialsReady: (result: MaterialFillResult) => void;
 }
+
+export type SlotFillValue =
+  | { kind: 'material'; value: MaterialMetadata }
+  | { kind: 'subtitle'; value: SubtitleMetadata };
 
 export function getMaterialFillStatus(selectedCount: number, totalCount: number, isLoading: boolean) {
   return {
@@ -24,11 +35,16 @@ function buildMaterial(slot: Slot, path: string, probe?: ProbeResult): MaterialM
   };
 }
 
-function formatMetadata(material: MaterialMetadata | undefined): string {
-  if (!material) {
+export function formatSlotFillValue(fill: SlotFillValue | undefined | null): string {
+  if (!fill) {
     return '未选择';
   }
 
+  if (fill.kind === 'subtitle') {
+    return '已读取字幕内容';
+  }
+
+  const material = fill.value;
   const parts = [];
   if (typeof material.duration === 'number') {
     parts.push(`${material.duration.toFixed(2)} 秒`);
@@ -39,38 +55,107 @@ function formatMetadata(material: MaterialMetadata | undefined): string {
   return parts.length > 0 ? parts.join(' / ') : '已选择';
 }
 
+export async function collectSlotFill(slot: Slot): Promise<SlotFillValue | null> {
+  let selectedPath: string | null = null;
+  let probe: ProbeResult | undefined;
+
+  if (slot.type === 'video') {
+    selectedPath = await window.vectcut.selectVideoFile();
+    if (selectedPath) {
+      probe = await window.vectcut.probeMedia(selectedPath);
+    }
+  } else if (slot.type === 'audio' || slot.type === 'bgm') {
+    selectedPath = await window.vectcut.selectAudioFile();
+    if (selectedPath) {
+      probe = await window.vectcut.probeMedia(selectedPath);
+    }
+  } else if (slot.type === 'cover_image') {
+    selectedPath = await window.vectcut.selectImageFile();
+    if (selectedPath) {
+      probe = await window.vectcut.probeMedia(selectedPath);
+    }
+  } else if (slot.type === 'subtitle') {
+    selectedPath = await window.vectcut.selectSrtFile();
+    if (!selectedPath) {
+      return null;
+    }
+    return {
+      kind: 'subtitle',
+      value: {
+        slot_id: slot.slot_id,
+        srt_content: await window.vectcut.readTextFile(selectedPath),
+      },
+    };
+  } else {
+    return null;
+  }
+
+  if (!selectedPath) {
+    return null;
+  }
+
+  return {
+    kind: 'material',
+    value: buildMaterial(slot, selectedPath, probe),
+  };
+}
+
+export function buildMaterialFillResult(
+  slots: Slot[],
+  fills: Record<string, SlotFillValue | undefined>,
+  coverTitleTexts: Record<string, string>,
+): MaterialFillResult {
+  const materials: MaterialMetadata[] = [];
+  const subtitles: SubtitleMetadata[] = [];
+  const coverTitles: CoverTitleMetadata[] = [];
+
+  for (const slot of slots) {
+    if (slot.type === 'cover_title') {
+      const text = coverTitleTexts[slot.slot_id]?.trim();
+      if (text) {
+        coverTitles.push({ slot_id: slot.slot_id, text });
+      }
+      continue;
+    }
+
+    const fill = fills[slot.slot_id];
+    if (fill?.kind === 'material') {
+      materials.push(fill.value);
+    } else if (fill?.kind === 'subtitle') {
+      subtitles.push(fill.value);
+    }
+  }
+
+  return { materials, subtitles, coverTitles };
+}
+
+function formatSlotPath(fill: SlotFillValue | undefined): string {
+  if (!fill) {
+    return '未选择';
+  }
+  return fill.kind === 'material' ? fill.value.path : '已读取字幕内容';
+}
+
 export default function MaterialFill({ slots, onMaterialsReady }: MaterialFillProps) {
-  const [materials, setMaterials] = useState<Record<string, MaterialMetadata>>({});
+  const [fills, setFills] = useState<Record<string, SlotFillValue>>({});
+  const [coverTitleTexts, setCoverTitleTexts] = useState<Record<string, string>>({});
   const [loadingSlotId, setLoadingSlotId] = useState('');
   const [error, setError] = useState('');
 
   async function handleSelect(slot: Slot) {
+    if (slot.type === 'cover_title') {
+      return;
+    }
+
     setError('');
     setLoadingSlotId(slot.slot_id);
     try {
-      let selectedPath: string | null = null;
-      let probe: ProbeResult | undefined;
-
-      if (slot.type === 'video') {
-        selectedPath = await window.vectcut.selectVideoFile();
-        if (selectedPath) {
-          probe = await window.vectcut.probeMedia(selectedPath);
-        }
-      } else if (slot.type === 'audio' || slot.type === 'bgm') {
-        selectedPath = await window.vectcut.selectAudioFile();
-        if (selectedPath) {
-          probe = await window.vectcut.probeMedia(selectedPath);
-        }
-      } else {
-        selectedPath = await window.vectcut.selectSrtFile();
-      }
-
-      if (!selectedPath) {
+      const nextFill = await collectSlotFill(slot);
+      if (!nextFill) {
         return;
       }
 
-      const nextMaterial = buildMaterial(slot, selectedPath, probe);
-      setMaterials((current) => ({ ...current, [slot.slot_id]: nextMaterial }));
+      setFills((current) => ({ ...current, [slot.slot_id]: nextFill }));
     } catch (caught) {
       setError(formatUserFacingError(caught));
     } finally {
@@ -78,10 +163,20 @@ export default function MaterialFill({ slots, onMaterialsReady }: MaterialFillPr
     }
   }
 
-  const selectedMaterials = slots
-    .map((slot) => materials[slot.slot_id])
-    .filter((material): material is MaterialMetadata => Boolean(material));
-  const fillStatus = getMaterialFillStatus(selectedMaterials.length, slots.length, Boolean(loadingSlotId));
+  function handleCoverTitleChange(slotId: string, text: string) {
+    setCoverTitleTexts((current) => ({ ...current, [slotId]: text }));
+  }
+
+  function isSlotFilled(slot: Slot): boolean {
+    if (slot.type === 'cover_title') {
+      return Boolean(coverTitleTexts[slot.slot_id]?.trim());
+    }
+    return Boolean(fills[slot.slot_id]);
+  }
+
+  const selectedCount = slots.filter(isSlotFilled).length;
+  const fillStatus = getMaterialFillStatus(selectedCount, slots.length, Boolean(loadingSlotId));
+  const readyResult = buildMaterialFillResult(slots, fills, coverTitleTexts);
 
   return (
     <section aria-labelledby="material-fill-title" style={{ display: 'grid', gap: 16 }}>
@@ -90,7 +185,7 @@ export default function MaterialFill({ slots, onMaterialsReady }: MaterialFillPr
           素材填充
         </h2>
         <p style={{ margin: 0, color: '#475569' }}>
-          为已选槽位指定本地素材。视频和音频会自动读取时长，字幕仅记录 SRT 路径。
+          为已选槽位指定本地素材。视频、音频和图片会自动读取媒体信息，字幕会读取文本内容。
         </p>
       </div>
 
@@ -108,18 +203,34 @@ export default function MaterialFill({ slots, onMaterialsReady }: MaterialFillPr
             </thead>
             <tbody>
               {slots.map((slot) => {
-                const material = materials[slot.slot_id];
+                const fill = fills[slot.slot_id];
                 const isLoading = loadingSlotId === slot.slot_id;
+                const isCoverTitle = slot.type === 'cover_title';
+                const coverTitleText = coverTitleTexts[slot.slot_id] ?? '';
                 return (
                   <tr key={slot.slot_id}>
                     <td style={tdStyle}>{slot.slot_id}</td>
                     <td style={tdStyle}>{slot.type}</td>
-                    <td style={tdStyle}>{material?.path || '未选择'}</td>
-                    <td style={tdStyle}>{isLoading ? '正在读取...' : formatMetadata(material)}</td>
                     <td style={tdStyle}>
-                      <button type="button" onClick={() => handleSelect(slot)} disabled={Boolean(loadingSlotId)} style={secondaryButtonStyle}>
-                        {material ? '替换素材' : '选择素材'}
-                      </button>
+                      {isCoverTitle ? (
+                        <input
+                          aria-label={`封面标题 ${slot.slot_id}`}
+                          value={coverTitleText}
+                          onChange={(event) => handleCoverTitleChange(slot.slot_id, event.currentTarget.value)}
+                          placeholder="请输入封面标题"
+                          style={textInputStyle}
+                        />
+                      ) : (
+                        formatSlotPath(fill)
+                      )}
+                    </td>
+                    <td style={tdStyle}>{isLoading ? '正在读取...' : formatSlotFillValue(fill)}</td>
+                    <td style={tdStyle}>
+                      {isCoverTitle ? null : (
+                        <button type="button" onClick={() => handleSelect(slot)} disabled={Boolean(loadingSlotId)} style={secondaryButtonStyle}>
+                          {fill ? '替换素材' : '选择素材'}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -134,7 +245,7 @@ export default function MaterialFill({ slots, onMaterialsReady }: MaterialFillPr
       <div>
         <button
           type="button"
-          onClick={() => onMaterialsReady(selectedMaterials)}
+          onClick={() => onMaterialsReady(readyResult)}
           disabled={!fillStatus.canConfirm}
           style={primaryButtonStyle}
         >
@@ -183,6 +294,17 @@ const secondaryButtonStyle = {
   font: 'inherit',
   cursor: 'pointer',
   whiteSpace: 'nowrap',
+} satisfies React.CSSProperties;
+
+const textInputStyle = {
+  width: '100%',
+  minWidth: 180,
+  minHeight: 34,
+  boxSizing: 'border-box',
+  padding: '6px 8px',
+  border: '1px solid #94a3b8',
+  borderRadius: 6,
+  font: 'inherit',
 } satisfies React.CSSProperties;
 
 const emptyStyle = {

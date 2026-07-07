@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { downloadDraft, renderDraft } from '../api/client';
 import { formatUserFacingError, type ApiError } from '../api/errorMessages';
 import ErrorDialog from '../components/ErrorDialog';
-import type { MaterialMetadata } from '../types';
+import type { CoverTitleMetadata, MaterialMetadata, SubtitleMetadata } from '../types';
 
 interface GenerateImportProps {
   templateId: string;
   materials: MaterialMetadata[];
+  subtitles: SubtitleMetadata[];
+  coverTitles: CoverTitleMetadata[];
   onRestart: () => void;
 }
 
@@ -53,7 +55,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }
 
-export default function GenerateImport({ templateId, materials, onRestart }: GenerateImportProps) {
+export default function GenerateImport({
+  templateId,
+  materials,
+  subtitles,
+  coverTitles,
+  onRestart,
+}: GenerateImportProps) {
   const [flowState, setFlowState] = useState<FlowState>('idle');
   const [taskId, setTaskId] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -69,7 +77,7 @@ export default function GenerateImport({ templateId, materials, onRestart }: Gen
     setWarnings([]);
 
     try {
-      const rendered = await renderDraft(templateId, materials);
+      const rendered = await renderDraft(templateId, materials, subtitles, coverTitles);
       setTaskId(rendered.task_id);
       setWarnings(rendered.warnings);
 
@@ -98,6 +106,7 @@ export default function GenerateImport({ templateId, materials, onRestart }: Gen
   }
 
   const isBusy = flowState === 'rendering' || flowState === 'downloading' || flowState === 'importing';
+  const slotValueCount = materials.length + subtitles.length + coverTitles.length;
 
   return (
     <section aria-labelledby="generate-import-title" style={{ display: 'grid', gap: 16 }}>
@@ -106,7 +115,7 @@ export default function GenerateImport({ templateId, materials, onRestart }: Gen
           生成导入
         </h2>
         <p style={{ margin: 0, color: '#475569' }}>
-          使用模板 {templateId} 和 {materials.length} 个素材生成草稿 ZIP，保存后导入剪映草稿目录。
+          使用模板 {templateId} 和 {slotValueCount} 个槽位值生成草稿 ZIP，保存后导入剪映草稿目录。
         </p>
       </div>
 
@@ -121,7 +130,7 @@ export default function GenerateImport({ templateId, materials, onRestart }: Gen
         </div>
         <div>
           <dt style={dtStyle}>素材数量</dt>
-          <dd style={ddStyle}>{materials.length}</dd>
+          <dd style={ddStyle}>{slotValueCount}</dd>
         </div>
       </dl>
 
@@ -152,7 +161,7 @@ export default function GenerateImport({ templateId, materials, onRestart }: Gen
             开始下一个模板
           </button>
         ) : (
-          <button type="button" onClick={handleStart} disabled={isBusy || materials.length === 0} style={primaryButtonStyle}>
+          <button type="button" onClick={handleStart} disabled={isBusy || slotValueCount === 0} style={primaryButtonStyle}>
             {isBusy ? stateText(flowState) : '开始生成并导入'}
           </button>
         )}

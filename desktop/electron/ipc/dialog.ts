@@ -1,5 +1,5 @@
 import { dialog } from 'electron';
-import { lstat, readFile, stat, writeFile } from 'fs/promises';
+import { lstat, readFile, realpath, stat, writeFile } from 'fs/promises';
 import { extname } from 'path';
 import type { IpcMain } from 'electron';
 
@@ -7,7 +7,9 @@ export const VIDEO_EXTS = ['mp4', 'mov', 'avi', 'mkv', 'flv'];
 export const AUDIO_EXTS = ['mp3', 'wav', 'aac', 'm4a', 'flac'];
 export const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'webp', 'bmp'];
 const MAX_ZIP_BYTES = 100 * 1024 * 1024;
+const MAX_TEXT_BYTES = 1 * 1024 * 1024;
 const authorizedZipSavePaths = new Set<string>();
+const authorizedTextReadPaths = new Set<string>();
 
 export async function pickFile(name: string, extensions: string[]): Promise<string | null> {
   const result = await dialog.showOpenDialog({
@@ -17,6 +19,16 @@ export async function pickFile(name: string, extensions: string[]): Promise<stri
   });
 
   return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0];
+}
+
+export async function selectSrtFile(): Promise<string | null> {
+  const filePath = await pickFile('SRT 字幕', ['srt', 'txt']);
+  if (!filePath) {
+    return null;
+  }
+
+  authorizedTextReadPaths.add(await realpath(filePath));
+  return filePath;
 }
 
 export async function readZipFile(
@@ -50,6 +62,47 @@ export async function readZipFile(
   }
 
   return readFile(filePath);
+}
+
+export async function readTextFile(
+  filePath: string,
+  maxBytes = MAX_TEXT_BYTES,
+): Promise<string> {
+  if (typeof filePath !== 'string' || filePath.trim() === '') {
+    throw new Error('文本文件路径不能为空');
+  }
+
+  const extension = extname(filePath).toLowerCase();
+  if (extension !== '.srt' && extension !== '.txt') {
+    throw new Error('仅支持 .srt/.txt 文件');
+  }
+
+  let fileStat;
+  try {
+    fileStat = await stat(filePath);
+  } catch (error) {
+    if (isNodeError(error) && error.code === 'ENOENT') {
+      throw new Error(`文本文件不存在：${filePath}`);
+    }
+    throw error;
+  }
+
+  if (!fileStat.isFile()) {
+    throw new Error(`文本路径不是文件：${filePath}`);
+  }
+
+  const canonicalPath = await realpath(filePath);
+  if (!authorizedTextReadPaths.has(canonicalPath)) {
+    throw new Error('文本文件路径未授权');
+  }
+
+  if (fileStat.size > maxBytes) {
+    throw new Error('文本文件过大');
+  }
+
+  const content = await readFile(canonicalPath, 'utf8');
+  authorizedTextReadPaths.delete(canonicalPath);
+  return content;
 }
 
 export async function selectDraftSavePath(suggestedName: string): Promise<string | null> {
@@ -136,7 +189,7 @@ export function registerDialogHandlers(ipcMain: IpcMain): void {
   ipcMain.handle('dialog:selectVideoFile', () => pickFile('视频', VIDEO_EXTS));
   ipcMain.handle('dialog:selectAudioFile', () => pickFile('音频', AUDIO_EXTS));
   ipcMain.handle('dialog:selectImageFile', () => pickFile('图片', IMAGE_EXTS));
-  ipcMain.handle('dialog:selectSrtFile', () => pickFile('SRT 字幕', ['srt', 'txt']));
+  ipcMain.handle('dialog:selectSrtFile', () => selectSrtFile());
   ipcMain.handle('dialog:selectTemplateFolder', async () => {
     const result = await dialog.showOpenDialog({
       title: '选择母版草稿文件夹',
@@ -149,6 +202,7 @@ export function registerDialogHandlers(ipcMain: IpcMain): void {
   ipcMain.handle('dialog:selectDraftSavePath', (_event, suggestedName: string) =>
     selectDraftSavePath(suggestedName));
   ipcMain.handle('file:readZip', (_event, filePath: string) => readZipFile(filePath));
+  ipcMain.handle('file:readText', (_event, filePath: string) => readTextFile(filePath));
   ipcMain.handle('file:writeZip', (_event, savePath: string, data: ArrayBuffer | Uint8Array) =>
     writeZipFile(savePath, data));
 }

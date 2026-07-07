@@ -1,7 +1,7 @@
 import type { IpcMain } from 'electron';
 import { execFile } from 'child_process';
 import { existsSync } from 'fs';
-import { mkdir, stat } from 'fs/promises';
+import { mkdir, readdir, readFile, stat } from 'fs/promises';
 import os from 'os';
 import { basename, extname, join } from 'path';
 import { promisify } from 'util';
@@ -19,13 +19,82 @@ export function detectDraftDir(): string | null {
   return existsSync(candidate) ? candidate : null;
 }
 
+export function parseJianyingVersionFromIni(content: string): string | null {
+  for (const line of content.split(/\r?\n/)) {
+    const match = /^\s*last_version\s*=\s*([^;#\s]+)/i.exec(line);
+    const version = normalizeVersionValue(match?.[1]);
+    if (version) {
+      return version;
+    }
+  }
+
+  return null;
+}
+
+export function parseJianyingVersionFromPacketXml(content: string): string | null {
+  return normalizeVersionValue(parseXmlValue(content, 'full_appver'))
+    ?? normalizeVersionValue(parseXmlValue(content, 'appver'));
+}
+
+export function selectLatestVersion(versions: string[]): string | null {
+  const validVersions = versions
+    .map((version) => ({ version: version.trim(), parts: parseVersionParts(version) }))
+    .filter((entry): entry is { version: string; parts: number[] } => entry.parts !== null);
+
+  if (validVersions.length === 0) {
+    return null;
+  }
+
+  validVersions.sort((left, right) => compareVersionParts(right.parts, left.parts));
+  return validVersions[0].version;
+}
+
+export async function detectVersionFromAppsDir(appsDir: string): Promise<string | null> {
+  const iniContent = await readTextOrNull(join(appsDir, 'Configure.ini'));
+  const iniVersion = iniContent ? parseJianyingVersionFromIni(iniContent) : null;
+  if (iniVersion) {
+    return iniVersion;
+  }
+
+  const packetXmlContent = await readTextOrNull(join(appsDir, 'JianyingProPacket.xml'));
+  const packetXmlVersion = packetXmlContent ? parseJianyingVersionFromPacketXml(packetXmlContent) : null;
+  if (packetXmlVersion) {
+    return packetXmlVersion;
+  }
+
+  try {
+    const entries = await readdir(appsDir, { withFileTypes: true });
+    return selectLatestVersion(entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name));
+  } catch {
+    return null;
+  }
+}
+
 export async function detectVersion(): Promise<string | null> {
-  // MVP placeholder; real Jianying version discovery is planned separately.
-  return '10.5.0';
+  try {
+    if (process.platform === 'win32') {
+      return detectVersionFromWindowsLocalAppData(process.env.LOCALAPPDATA);
+    }
+
+    if (process.platform === 'darwin') {
+      return detectVersionFromMacApplications();
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export function isVersionSupported(version: string): boolean {
-  return /^10\.[0-9]\.\d+$/.test(version);
+  const match = /^(\d+)\.(\d+)\.\d+(?:\.\d+)*$/.exec(version.trim());
+  if (!match) {
+    return false;
+  }
+
+  const major = Number.parseInt(match[1], 10);
+  const minor = Number.parseInt(match[2], 10);
+  return major === 10 && minor >= 0 && minor <= 9;
 }
 
 export async function importDraft(zipPath: string, draftDir: string): Promise<{ draftDir: string }> {
@@ -98,6 +167,81 @@ async function createUniqueDraftDir(draftDir: string, baseName: string): Promise
       }
     }
   }
+}
+
+function parseXmlValue(content: string, tagName: string): string | null {
+  const match = new RegExp(`<${tagName}\\b[^>]*\\bvalue\\s*=\\s*["']([^"']+)["'][^>]*>`, 'i').exec(content);
+  return match?.[1]?.trim() || null;
+}
+
+function normalizeVersionValue(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return parseVersionParts(trimmed) ? trimmed : null;
+}
+
+function parseVersionParts(version: string): number[] | null {
+  const trimmed = version.trim();
+  if (!/^\d+\.\d+\.\d+(?:\.\d+)*$/.test(trimmed)) {
+    return null;
+  }
+
+  return trimmed.split('.').map((part) => Number.parseInt(part, 10));
+}
+
+function compareVersionParts(left: number[], right: number[]): number {
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index++) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference !== 0) {
+      return difference;
+    }
+  }
+
+  return 0;
+}
+
+async function readTextOrNull(filePath: string): Promise<string | null> {
+  try {
+    return await readFile(filePath, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+function detectVersionFromWindowsLocalAppData(localAppData: string | undefined): Promise<string | null> {
+  const baseDir = localAppData?.trim() || join(os.homedir(), 'AppData', 'Local');
+  return detectVersionFromAppsDir(join(baseDir, 'JianyingPro', 'Apps'));
+}
+
+async function detectVersionFromMacApplications(): Promise<string | null> {
+  const candidates = [
+    join('/Applications', 'JianyingPro.app', 'Contents', 'Info.plist'),
+    join(os.homedir(), 'Applications', 'JianyingPro.app', 'Contents', 'Info.plist'),
+  ];
+
+  for (const candidate of candidates) {
+    const content = await readTextOrNull(candidate);
+    const version = content ? parseVersionFromInfoPlist(content) : null;
+    if (version) {
+      return version;
+    }
+  }
+
+  return null;
+}
+
+export function parseVersionFromInfoPlist(content: string): string | null {
+  return normalizeVersionValue(parsePlistStringValue(content, 'CFBundleShortVersionString'))
+    ?? normalizeVersionValue(parsePlistStringValue(content, 'CFBundleVersion'));
+}
+
+function parsePlistStringValue(content: string, key: string): string | null {
+  const match = new RegExp(`<key>\\s*${key}\\s*</key>\\s*<string>\\s*([^<]+)\\s*</string>`, 'i').exec(content);
+  return match?.[1]?.trim() || null;
 }
 
 export function registerJianyingHandlers(ipcMain: IpcMain): void {

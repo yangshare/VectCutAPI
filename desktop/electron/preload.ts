@@ -48,6 +48,8 @@ const api: VectCutApi = {
   // 主进程 handler 负责 zip 扩展名、大小和路径来源校验。
   readZipFile: async (filePath: string) =>
     toArrayBuffer(await ipcRenderer.invoke('file:readZip', filePath) as ArrayBuffer | Uint8Array),
+  readTextFile: (filePath: string) =>
+    ipcRenderer.invoke('file:readText', filePath) as Promise<string>,
   writeZipFile: (savePath: string, data: ArrayBuffer) => {
     if (data.byteLength > MAX_ZIP_BYTES) {
       return Promise.reject(new Error('ZIP 文件过大'));
