@@ -123,6 +123,26 @@ def test_unexpected_exception_handler_logs_sanitized_error_without_raw_traceback
     assert "/home/alice/private" not in logs
 
 
+def test_unexpected_exception_handler_survives_sanitizer_placeholder_collision():
+    sub = FastAPI()
+
+    @sub.post("/raise_placeholder_collision")
+    def _raise_placeholder_collision():
+        raise RuntimeError("__VECTCUT_URL_0__ __VECTCUT_PATH_0__")
+
+    _wire_exception_handlers(sub)
+    client = TestClient(sub, raise_server_exceptions=False)
+
+    resp = client.post("/raise_placeholder_collision")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "INTERNAL_ERROR"
+    assert body["error"]["message"] == "服务器内部错误"
+    assert body["error"]["details"] == {}
+
+
 def test_validation_error_handler_returns_200_envelope():
     """RequestValidationError 由 FastAPI Pydantic 校验触发，返回结构化 200 外壳。"""
     sub = FastAPI()

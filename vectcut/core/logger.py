@@ -12,6 +12,7 @@ import logging
 import logging.handlers
 import os
 import re
+import uuid
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Dict
@@ -158,22 +159,29 @@ def sanitize_text(text: str) -> str:
     if not text:
         return text
 
+    placeholder_id = uuid.uuid4().hex
     sanitized_urls: list[str] = []
     sanitized_paths: list[str] = []
 
     def _stash_url(match: re.Match[str]) -> str:
         sanitized_urls.append(sanitize_url(match.group(0)))
-        return f"__VECTCUT_URL_{len(sanitized_urls) - 1}__"
+        return f"__VECTCUT_{placeholder_id}_URL_{len(sanitized_urls) - 1}__"
 
     def _restore_url(match: re.Match[str]) -> str:
-        return sanitized_urls[int(match.group(1))]
+        try:
+            return sanitized_urls[int(match.group(1))]
+        except (IndexError, ValueError):
+            return match.group(0)
 
     def _stash_path(path: str) -> str:
         sanitized_paths.append(sanitize_path(path))
-        return f"__VECTCUT_PATH_{len(sanitized_paths) - 1}__"
+        return f"__VECTCUT_{placeholder_id}_PATH_{len(sanitized_paths) - 1}__"
 
     def _restore_path(match: re.Match[str]) -> str:
-        return sanitized_paths[int(match.group(1))]
+        try:
+            return sanitized_paths[int(match.group(1))]
+        except (IndexError, ValueError):
+            return match.group(0)
 
     def _sanitize_secret(match: re.Match[str]) -> str:
         return (
@@ -207,8 +215,9 @@ def sanitize_text(text: str) -> str:
         text,
     )
     text = _FREE_TEXT_SECRET_PATTERN.sub(_sanitize_secret, text)
-    text = re.sub(r"__VECTCUT_PATH_(\d+)__", _restore_path, text)
-    return re.sub(r"__VECTCUT_URL_(\d+)__", _restore_url, text)
+    prefix = re.escape(placeholder_id)
+    text = re.sub(rf"__VECTCUT_{prefix}_PATH_(\d+)__", _restore_path, text)
+    return re.sub(rf"__VECTCUT_{prefix}_URL_(\d+)__", _restore_url, text)
 
 
 def sanitize_exception(exc: BaseException) -> str:

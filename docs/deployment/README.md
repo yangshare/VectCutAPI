@@ -106,6 +106,8 @@ curl -I http://localhost/health
 curl -k -u admin:<password> https://localhost/api/template/...
 ```
 
+Nginx `client_max_body_size` 设置为 52M，覆盖应用默认 50MiB + 1MiB multipart overhead。
+
 预期：
 
 - HTTPS 健康检查返回 `healthy`。

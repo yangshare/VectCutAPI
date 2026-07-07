@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
+
+from vectcut.core.config import Settings
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -67,6 +70,21 @@ def test_container_healthchecks_use_unauthenticated_health_path():
     assert "http://localhost:9001/api/health" not in compose
     assert "http://localhost:9001/health" in dockerfile
     assert "http://localhost:9001/api/health" not in dockerfile
+
+
+def test_nginx_upload_limit_covers_app_default_plus_multipart_overhead():
+    config = _read("docker/nginx.conf")
+    docs = _read("docs/deployment/README.md")
+    match = re.search(r"client_max_body_size\s+(\d+)M;", config)
+    assert match is not None
+
+    nginx_limit_mb = int(match.group(1))
+    required_mb = Settings().max_template_zip_mb + 1
+
+    assert nginx_limit_mb >= required_mb
+    assert "client_max_body_size 52M" in config
+    assert "52M" in docs
+    assert "50MiB + 1MiB multipart overhead" in docs
 
 
 def test_development_compose_keeps_api_loopback_only():

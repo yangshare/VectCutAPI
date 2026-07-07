@@ -12,8 +12,10 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 import hashlib
 import json
+import logging
 import os
 import shutil
+import socket
 import time
 import uuid
 import zipfile
@@ -24,10 +26,13 @@ from typing import Iterator, Optional
 from vectcut.core.config import load_config
 from vectcut.core.errors import VectCutError
 from vectcut.core.errors import make_error
+from vectcut.core.logger import sanitize_exception
 
 _MAX_TEMPLATE_ZIP_FILES = 10_000
 _WINDOWS_ABSOLUTE_ZIP_MEMBER_RE = re.compile(r"^[A-Za-z]:[\\/]")
 _TEMPLATE_LOCK_POLL_SECONDS = 0.05
+_DEFAULT_TEMPLATE_LOCK_STALE_SECONDS = 300.0
+_logger = logging.getLogger("vectcut.features.template_filling.storage")
 
 
 @dataclass(frozen=True)
@@ -52,38 +57,99 @@ def _safe_template_lock_name(template_id: str) -> str:
     return f"{safe[:80]}-{digest}.lock"
 
 
+def _is_pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def _read_lock_metadata(lock_path: Path) -> dict:
+    try:
+        return json.loads(lock_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _is_stale_lock(metadata: dict, stale_seconds: float, now: float) -> bool:
+    created_at = metadata.get("created_at")
+    if not isinstance(created_at, (int, float)):
+        return True
+    if stale_seconds >= 0 and now - float(created_at) > stale_seconds:
+        return True
+    if metadata.get("host") == socket.gethostname():
+        try:
+            pid = int(metadata.get("pid", 0))
+        except (TypeError, ValueError):
+            return True
+        if not _is_pid_alive(pid):
+            return True
+    return False
+
+
+def _try_reclaim_stale_lock(lock_path: Path, stale_seconds: float) -> bool:
+    metadata = _read_lock_metadata(lock_path)
+    if not _is_stale_lock(metadata, stale_seconds, time.time()):
+        return False
+    try:
+        lock_path.unlink()
+        return True
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
+
+
 @contextmanager
-def template_lock(template_id: str, timeout_seconds: float = 30.0) -> Iterator[None]:
+def template_lock(
+    template_id: str,
+    timeout_seconds: float = 30.0,
+    stale_seconds: float = _DEFAULT_TEMPLATE_LOCK_STALE_SECONDS,
+) -> Iterator[None]:
     """Acquire a cross-process per-template lock using atomic lock-file creation."""
     cfg = load_config()
     lock_dir = Path(cfg.template_folder) / ".locks"
     lock_dir.mkdir(parents=True, exist_ok=True)
     lock_path = lock_dir / _safe_template_lock_name(template_id)
     deadline = time.monotonic() + timeout_seconds
-    fd: int | None = None
+    owner = uuid.uuid4().hex
 
     while True:
         try:
-            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            os.write(fd, f"pid={os.getpid()}\n".encode("utf-8"))
+            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            metadata = {
+                "pid": os.getpid(),
+                "host": socket.gethostname(),
+                "created_at": time.time(),
+                "owner": owner,
+            }
+            os.write(fd, json.dumps(metadata, sort_keys=True).encode("utf-8"))
+            os.close(fd)
             break
         except FileExistsError as exc:
+            if _try_reclaim_stale_lock(lock_path, stale_seconds):
+                continue
             remaining = deadline - time.monotonic()
             if timeout_seconds <= 0 or remaining <= 0:
-                raise TimeoutError(
-                    f"Timed out acquiring template lock for {template_id}"
+                raise make_error(
+                    "T_LOCK_TIMEOUT",
+                    "模板正在被其它操作占用",
+                    details={"template_id": template_id},
                 ) from exc
             time.sleep(min(_TEMPLATE_LOCK_POLL_SECONDS, remaining))
 
     try:
         yield
     finally:
-        if fd is not None:
-            os.close(fd)
-        try:
-            lock_path.unlink()
-        except FileNotFoundError:
-            pass
+        metadata = _read_lock_metadata(lock_path)
+        if metadata.get("owner") == owner:
+            try:
+                lock_path.unlink()
+            except FileNotFoundError:
+                pass
 
 
 def save_template_zip(template_id: str, zip_path: str) -> str:
@@ -242,9 +308,21 @@ def commit_staged_template(stage: StagedTemplateZip) -> str:
         raise
     else:
         if backup_extract_dir.exists():
-            shutil.rmtree(backup_extract_dir)
+            try:
+                shutil.rmtree(backup_extract_dir)
+            except Exception as exc:
+                _logger.warning(
+                    "Template backup dir cleanup failed: %s",
+                    sanitize_exception(exc),
+                )
         if backup_zip_path.exists():
-            backup_zip_path.unlink()
+            try:
+                backup_zip_path.unlink()
+            except Exception as exc:
+                _logger.warning(
+                    "Template backup zip cleanup failed: %s",
+                    sanitize_exception(exc),
+                )
     return str(stage.final_extract_dir)
 
 
@@ -321,9 +399,19 @@ def save_slot_config(template_id: str, slots: list) -> None:
         Path(cfg.template_config_folder) / f"{template_id}_slots.json"
     )
     payload = {"template_id": template_id, "slots": slots}
-    target.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    tmp = target.with_name(f"{target.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, target)
+    except Exception:
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass
+        raise
 
 
 def load_slot_config(template_id: str) -> list:

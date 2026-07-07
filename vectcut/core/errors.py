@@ -74,6 +74,7 @@ ERROR_CODES = {
     "T_TOO_LARGE": "模板文件过大",
     "T_NO_DRAFT_CONTENT": "ZIP 中缺少 draft_content.json",
     "T_INVALID_ID": "模板 ID 非法",
+    "T_LOCK_TIMEOUT": "模板正在被其它操作占用",
     "S_NOT_FOUND": "槽位配置不存在",
     "S_TRACK_NOT_FOUND": "母版中找不到指定轨道",
     "S_SEGMENT_NOT_FOUND": "母版中找不到指定片段",

@@ -89,6 +89,12 @@ def test_sanitize_text_masks_short_free_text_secrets():
     assert "abc" not in result
 
 
+def test_sanitize_text_literal_placeholder_collision_does_not_raise():
+    result = sanitize_text("__VECTCUT_URL_0__ __VECTCUT_PATH_0__")
+    assert "__VECTCUT_URL_0__" in result
+    assert "__VECTCUT_PATH_0__" in result
+
+
 def test_sanitize_text_preserves_http_api_paths():
     result = sanitize_text("POST /api/template/import failed")
     assert "/api/template/import" in result

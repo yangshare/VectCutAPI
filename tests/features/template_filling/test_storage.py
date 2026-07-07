@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from vectcut.core.errors import SlotError, TemplateError
+from vectcut.core.errors import SlotError, TemplateError, VectCutError
 from vectcut.features.template_filling import storage
 
 
@@ -355,12 +355,66 @@ def test_commit_staged_template_preserves_existing_when_backup_fails(
     assert final_zip.read_bytes() == old_zip_bytes
 
 
+@pytest.mark.parametrize("cleanup_failure", ["dir_backup", "zip_backup"])
+def test_commit_staged_template_ignores_backup_cleanup_failure_after_success(
+    fake_cfg, tmp_path: Path, monkeypatch, cleanup_failure: str
+):
+    """新模板已安装后，旧 backup 清理失败不应让 commit 变成失败。"""
+    template_id = f"t_commit_cleanup_{cleanup_failure}"
+    template_root = Path(fake_cfg.template_folder)
+    final_dir = template_root / template_id
+    final_zip = template_root / f"{template_id}.zip"
+    final_dir.mkdir(parents=True)
+    (final_dir / "draft_content.json").write_text('{"old": true}', encoding="utf-8")
+    _make_zip_with_file(final_zip, "draft_content.json", b'{"old": true}')
+
+    staging_dir = template_root / f"{template_id}.tmp-stage"
+    staging_zip = template_root / f"{template_id}.tmp-stage.zip"
+    staging_dir.mkdir(parents=True)
+    (staging_dir / "draft_content.json").write_text('{"new": true}', encoding="utf-8")
+    _make_zip_with_file(staging_zip, "draft_content.json", b'{"new": true}')
+    stage = storage.StagedTemplateZip(
+        template_id=template_id,
+        extract_dir=staging_dir,
+        zip_path=staging_zip,
+        final_extract_dir=final_dir,
+        final_zip_path=final_zip,
+    )
+
+    if cleanup_failure == "dir_backup":
+        original_rmtree = storage.shutil.rmtree
+
+        def _fail_backup_rmtree(path):
+            if Path(path).name.startswith(f"{template_id}.bak-"):
+                raise OSError("backup dir cleanup failed")
+            return original_rmtree(path)
+
+        monkeypatch.setattr(storage.shutil, "rmtree", _fail_backup_rmtree)
+    else:
+        original_unlink = Path.unlink
+
+        def _fail_backup_unlink(self, *args, **kwargs):
+            if self.name.startswith(f"{template_id}.zip.bak-"):
+                raise OSError("backup zip cleanup failed")
+            return original_unlink(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "unlink", _fail_backup_unlink)
+
+    committed_path = storage.commit_staged_template(stage)
+
+    assert committed_path == str(final_dir)
+    assert (final_dir / "draft_content.json").read_text(encoding="utf-8") == '{"new": true}'
+    with zipfile.ZipFile(final_zip) as zf:
+        assert zf.read("draft_content.json") == b'{"new": true}'
+
+
 def test_template_lock_times_out_for_same_template_id(fake_cfg):
-    """同一 template_id 的第二个跨进程文件锁获取应等待并在超时后失败。"""
+    """同一 template_id 的第二个跨进程文件锁获取应结构化超时。"""
     with storage.template_lock("tpl_lock", timeout_seconds=1):
-        with pytest.raises(TimeoutError):
+        with pytest.raises(VectCutError) as exc:
             with storage.template_lock("tpl_lock", timeout_seconds=0):
                 pass
+    assert exc.value.code == "T_LOCK_TIMEOUT"
 
 
 def test_template_lock_allows_different_template_ids(fake_cfg):
@@ -378,6 +432,46 @@ def test_template_lock_sanitizes_lock_file_name(fake_cfg):
     lock_dir = Path(fake_cfg.template_folder) / ".locks"
     assert lock_dir.is_dir()
     assert not (Path(fake_cfg.template_folder).parent / "tpl_lock.lock").exists()
+
+
+def test_template_lock_recovers_stale_lock_file(fake_cfg):
+    lock_dir = Path(fake_cfg.template_folder) / ".locks"
+    lock_dir.mkdir(parents=True)
+    lock_path = lock_dir / storage._safe_template_lock_name("tpl_stale")
+    lock_path.write_text(
+        json.dumps({
+            "pid": 99999999,
+            "host": "old-host",
+            "created_at": 0,
+            "owner": "old-owner",
+        }),
+        encoding="utf-8",
+    )
+
+    with storage.template_lock("tpl_stale", timeout_seconds=0, stale_seconds=1):
+        assert lock_path.exists()
+
+    assert not lock_path.exists()
+
+
+def test_template_lock_release_does_not_delete_different_owner(fake_cfg):
+    lock_dir = Path(fake_cfg.template_folder) / ".locks"
+    lock_path = lock_dir / storage._safe_template_lock_name("tpl_owner")
+
+    with storage.template_lock("tpl_owner", timeout_seconds=1):
+        lock_path.write_text(
+            json.dumps({
+                "pid": 123456,
+                "host": "other-host",
+                "created_at": 999999,
+                "owner": "other-owner",
+            }),
+            encoding="utf-8",
+        )
+
+    assert lock_path.exists()
+    assert "other-owner" in lock_path.read_text(encoding="utf-8")
+    lock_path.unlink()
 
 
 # ─── get_template_draft_content_path ───────────────────────────────────────
@@ -428,6 +522,30 @@ def test_save_and_load_slot_config(fake_cfg):
 
     loaded = storage.load_slot_config("t7")
     assert loaded == slots
+
+
+def test_save_slot_config_replace_failure_preserves_existing_config(
+    fake_cfg, monkeypatch
+):
+    storage.save_slot_config("t_atomic", [{"slot_id": "old"}])
+    cfg_file = Path(fake_cfg.template_config_folder) / "t_atomic_slots.json"
+    old_content = cfg_file.read_text(encoding="utf-8")
+
+    original_replace = storage.os.replace
+
+    def _fail_slot_config_replace(src, dst):
+        if Path(dst) == cfg_file:
+            raise OSError("atomic replace failed")
+        return original_replace(src, dst)
+
+    monkeypatch.setattr(storage.os, "replace", _fail_slot_config_replace)
+
+    with pytest.raises(OSError, match="atomic replace failed"):
+        storage.save_slot_config("t_atomic", [{"slot_id": "new"}])
+
+    assert cfg_file.read_text(encoding="utf-8") == old_content
+    assert storage.load_slot_config("t_atomic") == [{"slot_id": "old"}]
+    assert not list(Path(fake_cfg.template_config_folder).glob("t_atomic_slots.*.tmp"))
 
 
 def test_load_slot_config_not_found(fake_cfg):
