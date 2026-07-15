@@ -122,7 +122,7 @@ python run_mcp.py # 启动 MCP 协议服务，支持 stdio 通信
 
 ## MCP 集成指南
 
-[MCP 文档](MCP_文档.md) 
+[MCP 文档](docs/mcp.md) 
 
 ### 1. 客户端配置
 
