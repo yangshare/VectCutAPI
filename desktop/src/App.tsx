@@ -11,7 +11,7 @@ import { getUnsupportedJianyingVersionMessage } from './utils/jianyingVersion';
 const STEPS = ['导入母版', '槽位配置', '素材填充', '生成导入'];
 
 function createEmptyMaterialFillResult(): MaterialFillResult {
-  return { materials: [], subtitles: [], coverTitles: [] };
+  return { materials: [], subtitles: [], textSlots: [], coverTitles: [] };
 }
 
 export function getStartupJianyingVersionWarning(version: string | null): string | null {
@@ -58,11 +58,12 @@ export default function App() {
   }, []);
 
   function handleTemplateImported(importedTemplateId: string, importedSlots: Slot[]) {
+    const restoredSlots = importedSlots.filter((slot) => slot.replaceable && slot.selected);
     setTemplateId(importedTemplateId);
     setSlots(importedSlots);
-    setSelectedSlots([]);
+    setSelectedSlots(restoredSlots);
     setMaterialFillResult(createEmptyMaterialFillResult());
-    setStep(1);
+    setStep(restoredSlots.length > 0 ? 2 : 1);
   }
 
   function handleConfigSaved(selected: Slot[]) {
@@ -133,6 +134,7 @@ export default function App() {
                   templateId={templateId}
                   materials={materialFillResult.materials}
                   subtitles={materialFillResult.subtitles}
+                  textSlots={materialFillResult.textSlots}
                   coverTitles={materialFillResult.coverTitles}
                   onRestart={handleRestart}
                 />

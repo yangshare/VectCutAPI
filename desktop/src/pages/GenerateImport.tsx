@@ -2,12 +2,18 @@ import { useState } from 'react';
 import { downloadDraft, renderDraft } from '../api/client';
 import { formatUserFacingError, type ApiError } from '../api/errorMessages';
 import ErrorDialog from '../components/ErrorDialog';
-import type { CoverTitleMetadata, MaterialMetadata, SubtitleMetadata } from '../types';
+import type {
+  CoverTitleMetadata,
+  MaterialSlotMetadata,
+  SubtitleMetadata,
+  TextSlotMetadata,
+} from '../types';
 
 interface GenerateImportProps {
   templateId: string;
-  materials: MaterialMetadata[];
+  materials: MaterialSlotMetadata[];
   subtitles: SubtitleMetadata[];
+  textSlots: TextSlotMetadata[];
   coverTitles: CoverTitleMetadata[];
   onRestart: () => void;
 }
@@ -59,6 +65,7 @@ export default function GenerateImport({
   templateId,
   materials,
   subtitles,
+  textSlots,
   coverTitles,
   onRestart,
 }: GenerateImportProps) {
@@ -77,7 +84,7 @@ export default function GenerateImport({
     setWarnings([]);
 
     try {
-      const rendered = await renderDraft(templateId, materials, subtitles, coverTitles);
+      const rendered = await renderDraft(templateId, materials, subtitles, coverTitles, textSlots);
       setTaskId(rendered.task_id);
       setWarnings(rendered.warnings);
 
@@ -106,7 +113,7 @@ export default function GenerateImport({
   }
 
   const isBusy = flowState === 'rendering' || flowState === 'downloading' || flowState === 'importing';
-  const slotValueCount = materials.length + subtitles.length + coverTitles.length;
+  const slotValueCount = materials.length + subtitles.length + textSlots.length + coverTitles.length;
 
   return (
     <section aria-labelledby="generate-import-title" style={{ display: 'grid', gap: 16 }}>

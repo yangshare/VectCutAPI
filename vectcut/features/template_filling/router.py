@@ -22,6 +22,7 @@ from pydantic import ValidationError
 from vectcut.core.config import load_config
 from vectcut.core.errors import VectCutError
 from vectcut.core.errors import make_error
+from vectcut.core.logger import sanitize_exception
 from vectcut.features.template_filling import service, storage
 from vectcut.features.template_filling.schemas import (
     RenderDraftRequest,
@@ -198,6 +199,13 @@ def render_draft(body: dict):
         return envelope_ok(resp.model_dump())
     except VectCutError as e:
         return envelope_err(e)
+    except Exception as e:
+        return envelope_err(
+            make_error(
+                "R_GENERATE_FAILED",
+                details={"reason": sanitize_exception(e)},
+            )
+        )
 
 
 @router.get("/download/{draft_id}")

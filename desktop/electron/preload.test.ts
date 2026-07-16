@@ -24,6 +24,16 @@ describe('preload controlled IPC API', () => {
       expectedInvokeArgs: ['dialog:selectVideoFile'],
     },
     {
+      method: 'selectVideoFiles',
+      args: [],
+      expectedInvokeArgs: ['dialog:selectVideoFiles'],
+    },
+    {
+      method: 'selectVideoDirectory',
+      args: [],
+      expectedInvokeArgs: ['dialog:selectVideoDirectory'],
+    },
+    {
       method: 'selectAudioFile',
       args: [],
       expectedInvokeArgs: ['dialog:selectAudioFile'],
@@ -139,6 +149,8 @@ describe('preload controlled IPC API', () => {
       'selectSrtFile',
       'selectTemplateFolder',
       'selectVideoFile',
+      'selectVideoFiles',
+      'selectVideoDirectory',
       'setUserConfig',
       'selectDraftSavePath',
       'writeZipFile',

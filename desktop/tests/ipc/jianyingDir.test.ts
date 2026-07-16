@@ -15,7 +15,10 @@ import {
 } from '../../electron/ipc/jianyingDir';
 
 const { execFileMock } = vi.hoisted(() => ({
-  execFileMock: vi.fn((_file, _args, callback) => callback(null, '', '')),
+  execFileMock: vi.fn((_file, _args, optionsOrCallback, maybeCallback) => {
+    const callback = typeof optionsOrCallback === 'function' ? optionsOrCallback : maybeCallback;
+    callback(null, '', '');
+  }),
 }));
 
 vi.mock('child_process', () => ({
@@ -219,22 +222,55 @@ describe('importDraft', () => {
     expect(execFileMock).toHaveBeenCalledTimes(1);
   });
 
-  it('passes zip and target paths as execFile arguments without shell-concatenating user paths', async () => {
+  it('uses an encoded PowerShell command with environment paths on Windows', async () => {
+    const restorePlatform = stubProcessPlatform('win32');
     const tempDir = await mkdtemp(join(os.tmpdir(), 'jianying-draft-'));
     const draftDir = join(tempDir, 'drafts with space');
     const zipPath = join(tempDir, "draft with 'quote' [safe].zip");
     await writeFile(zipPath, 'zip content');
 
-    const result = await importDraft(zipPath, draftDir);
+    try {
+      const result = await importDraft(zipPath, draftDir);
 
-    const [command, args] = execFileMock.mock.calls[0];
-    expect(command).toEqual(expect.any(String));
-    expect(args).toEqual(expect.arrayContaining([zipPath, result.draftDir]));
-    for (const arg of args) {
-      if (typeof arg === 'string' && arg !== zipPath && arg !== result.draftDir) {
-        expect(arg).not.toContain(zipPath);
-        expect(arg).not.toContain(result.draftDir);
-      }
+      const [command, args, options] = execFileMock.mock.calls[0];
+      expect(command).toBe('powershell.exe');
+      expect(args).toEqual(expect.arrayContaining(['-EncodedCommand']));
+      expect(args).not.toContain('-Command');
+      expect(args).not.toContain(zipPath);
+      expect(args).not.toContain(result.draftDir);
+      expect(options).toMatchObject({
+        env: expect.objectContaining({
+          VECTCUT_IMPORT_ZIP_PATH: zipPath,
+          VECTCUT_IMPORT_DESTINATION_PATH: result.draftDir,
+        }),
+      });
+
+      const encodedCommand = args[args.indexOf('-EncodedCommand') + 1];
+      const decodedCommand = Buffer.from(encodedCommand, 'base64').toString('utf16le');
+      expect(decodedCommand).toContain('Expand-Archive');
+      expect(decodedCommand).toContain("$ProgressPreference = 'SilentlyContinue'");
+      expect(decodedCommand).toContain('$env:VECTCUT_IMPORT_ZIP_PATH');
+      expect(decodedCommand).toContain('$env:VECTCUT_IMPORT_DESTINATION_PATH');
+    } finally {
+      restorePlatform();
+    }
+  });
+
+  it('passes zip and target paths as direct unzip arguments on non-Windows', async () => {
+    const restorePlatform = stubProcessPlatform('linux');
+    const tempDir = await mkdtemp(join(os.tmpdir(), 'jianying-draft-'));
+    const draftDir = join(tempDir, 'drafts with space');
+    const zipPath = join(tempDir, "draft with 'quote' [safe].zip");
+    await writeFile(zipPath, 'zip content');
+
+    try {
+      const result = await importDraft(zipPath, draftDir);
+
+      const [command, args] = execFileMock.mock.calls[0];
+      expect(command).toBe('unzip');
+      expect(args).toEqual(['-o', zipPath, '-d', result.draftDir]);
+    } finally {
+      restorePlatform();
     }
   });
 });

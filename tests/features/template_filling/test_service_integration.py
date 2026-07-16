@@ -11,6 +11,7 @@ material_builder 内部真实构造 Video_material/Audio_material（仅依赖元
 
 from __future__ import annotations
 
+import json
 import zipfile
 from pathlib import Path
 
@@ -51,12 +52,12 @@ def test_full_workflow(temp_storage_dirs, mock_load_template, sample_template_zi
     import_resp = service.import_template("tpl_full", str(sample_template_zip))
     assert import_resp.template_id == "tpl_full"
     assert import_resp.message
-    # mock_script 含 video×2 + bgm×1 + subtitle×3 = 6 个槽位
+    # mock_script 含三条可替换业务轨道，每条轨道生成一个槽位。
     slot_types = [s["type"] for s in import_resp.slots]
-    assert slot_types.count("video") == 2
+    assert slot_types.count("video") == 1
     assert slot_types.count("bgm") == 1
-    assert slot_types.count("subtitle") == 3
-    assert len(import_resp.slots) == 6
+    assert slot_types.count("subtitle") == 1
+    assert len(import_resp.slots) == 3
 
     # 抽取一个 video slot 配置作为后续 render 用
     video_slot = next(s for s in import_resp.slots if s["type"] == "video")
@@ -70,6 +71,9 @@ def test_full_workflow(temp_storage_dirs, mock_load_template, sample_template_zi
             type=s["type"],
             track_name=s["track_name"],
             segment_index=s["segment_index"],
+            segment_indices=s["segment_indices"],
+            segment_count=s["segment_count"],
+            locator=s["locator"],
             required=s["slot_id"] == video_slot_id,
         )
         for s in import_resp.slots
@@ -77,7 +81,7 @@ def test_full_workflow(temp_storage_dirs, mock_load_template, sample_template_zi
     save_req = SaveSlotConfigRequest(template_id="tpl_full", slots=slot_configs)
     save_resp = service.save_slot_config("tpl_full", save_req)
     assert save_resp.template_id == "tpl_full"
-    assert save_resp.slot_count == 6
+    assert save_resp.slot_count == 3
     # 确认 JSON 已落盘
     cfg_file = temp_storage_dirs["configs"] / "tpl_full_slots.json"
     assert cfg_file.is_file()
@@ -87,10 +91,20 @@ def test_full_workflow(temp_storage_dirs, mock_load_template, sample_template_zi
         template_id="tpl_full",
         slot_values={
             video_slot_id: {
-                "path": "E:/clips/main.mp4",
-                "duration": 5.0,
-                "width": 1920,
-                "height": 1080,
+                "materials": [
+                    {
+                        "path": "E:/clips/main-1.mp4",
+                        "duration": 5.0,
+                        "width": 1920,
+                        "height": 1080,
+                    },
+                    {
+                        "path": "E:/clips/main-2.mp4",
+                        "duration": 5.0,
+                        "width": 1920,
+                        "height": 1080,
+                    },
+                ]
             }
         },
         output_draft_name="out_draft",
@@ -101,13 +115,33 @@ def test_full_workflow(temp_storage_dirs, mock_load_template, sample_template_zi
     # video 槽位替换无 warning
     assert render_resp.warnings == []
     # 确认 replace_material_by_seg 被调用过
-    assert len(mock_load_template.replace_calls) == 1
+    assert len(mock_load_template.replace_calls) == 2
     # 确认 zip 已生成
     generated_zip = temp_storage_dirs["generated"] / f"{render_resp.draft_id}.zip"
     assert generated_zip.is_file()
-    # zip 应当是合法的 zip（含 dump 出的 draft_content.json）
+    # zip 应当是完整的剪映 10.x 草稿包，而不是单独一个 draft_content.json。
     with zipfile.ZipFile(generated_zip) as zf:
-        assert "draft_content.json" in zf.namelist()
+        names = set(zf.namelist())
+        assert {
+            "draft_content.json",
+            "draft_content.json.bak",
+            "template-2.tmp",
+            "draft_meta_info.json",
+            "draft_settings",
+            "draft_virtual_store.json",
+            "timeline_layout.json",
+            "Timelines/project.json",
+        }.issubset(names)
+        timeline_content = [
+            name for name in names
+            if name.startswith("Timelines/") and name.endswith("/draft_content.json")
+        ]
+        assert len(timeline_content) == 1
+        assert zf.read(timeline_content[0]) == zf.read("draft_content.json")
+        meta = json.loads(zf.read("draft_meta_info.json").decode("utf-8"))
+        assert meta["draft_name"] == "out_draft"
+        assert meta["tm_draft_create"] > 0
+        assert meta["tm_draft_modified"] > 0
 
     # 4. download —— 真实 storage 找到 zip
     download_resp = service.download_draft(render_resp.draft_id)
@@ -137,6 +171,9 @@ def test_render_draft_does_not_copy_template_resource_files(
                     type=video_slot["type"],
                     track_name=video_slot["track_name"],
                     segment_index=video_slot["segment_index"],
+                    segment_indices=video_slot["segment_indices"],
+                    segment_count=video_slot["segment_count"],
+                    locator=video_slot["locator"],
                 )
             ],
         ),
@@ -148,10 +185,20 @@ def test_render_draft_does_not_copy_template_resource_files(
             template_id="tpl_resources",
             slot_values={
                 video_slot["slot_id"]: {
-                    "path": "E:/clips/main.mp4",
-                    "duration": 5.0,
-                    "width": 1920,
-                    "height": 1080,
+                    "materials": [
+                        {
+                            "path": "E:/clips/main-1.mp4",
+                            "duration": 5.0,
+                            "width": 1920,
+                            "height": 1080,
+                        },
+                        {
+                            "path": "E:/clips/main-2.mp4",
+                            "duration": 5.0,
+                            "width": 1920,
+                            "height": 1080,
+                        },
+                    ]
                 }
             },
             output_draft_name="out_resources",
@@ -162,8 +209,29 @@ def test_render_draft_does_not_copy_template_resource_files(
     with zipfile.ZipFile(generated_zip) as zf:
         names = set(zf.namelist())
         assert "draft_content.json" in names
+        assert "draft_meta_info.json" in names
+        assert "Timelines/project.json" in names
         assert "Resources/cover.png" not in names
         assert "Resources/audio/bgm.mp3" not in names
+
+
+def test_rendered_draft_gets_identity_distinct_from_source():
+    source_id = "98646CAE-2FB5-4246-BF3D-818AE2352FC4"
+    script = type("Script", (), {
+        "content": {
+            "id": source_id,
+            "name": "",
+            "create_time": 0,
+            "update_time": 0,
+        }
+    })()
+
+    service._prepare_rendered_draft_identity(script, "new draft")
+
+    assert script.content["id"] != source_id
+    assert script.content["name"] == "new draft"
+    assert script.content["create_time"] > 0
+    assert script.content["update_time"] == script.content["create_time"]
 
 
 def test_full_workflow_subtitle_import_and_cover_skip(

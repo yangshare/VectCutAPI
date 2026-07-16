@@ -26,3 +26,4 @@ desktop/*.local
 CLAUDE.md
 .superpowers/
 logs/
+data/

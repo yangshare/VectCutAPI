@@ -89,6 +89,8 @@ ERROR_CODES = {
     "R_INVALID_PATH": "素材路径格式无效",
     "R_INVALID_DURATION": "素材时长异常",
     "R_INVALID_MATERIAL_METADATA": "素材路径或元数据格式无效",
+    "R_MATERIAL_COUNT_MISMATCH": "视频素材数量与轨道片段数不一致",
+    "R_VIDEO_DURATION_SHORT": "视频目录总时长不足",
     "R_LOOP_TOO_MANY": "视频时长不足，需循环次数过多",
     "R_SRT_PARSE_ERROR": "SRT 文件格式错误",
     "R_GENERATE_FAILED": "草稿生成失败",

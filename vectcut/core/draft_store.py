@@ -162,7 +162,13 @@ def write_profile_content(profile: DraftProfile, draft_dir: os.PathLike, content
                 if timeline_dir != desired_timeline_dir:
                     if desired_timeline_dir.exists():
                         shutil.rmtree(desired_timeline_dir)
-                    timeline_dir.rename(desired_timeline_dir)
+                    try:
+                        timeline_dir.rename(desired_timeline_dir)
+                    except PermissionError:
+                        # Windows can deny renaming populated draft folders even
+                        # when creating and deleting children is permitted.
+                        shutil.copytree(timeline_dir, desired_timeline_dir)
+                        shutil.rmtree(timeline_dir)
                     timeline_dirs = [desired_timeline_dir]
 
             for timeline_dir in timeline_dirs:

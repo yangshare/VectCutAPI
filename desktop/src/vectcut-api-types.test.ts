@@ -3,6 +3,11 @@ import type { UserConfig } from './types';
 
 test('window.vectcut exposes controlled IPC methods to the renderer', () => {
   expectTypeOf<Window['vectcut']['selectVideoFile']>().returns.resolves.toEqualTypeOf<string | null>();
+  expectTypeOf<Window['vectcut']['selectVideoFiles']>().returns.resolves.toEqualTypeOf<string[]>();
+  expectTypeOf<Window['vectcut']['selectVideoDirectory']>().returns.resolves.toEqualTypeOf<{
+    directory: string;
+    files: string[];
+  } | null>();
   expectTypeOf<Window['vectcut']['probeMedia']>().parameter(0).toEqualTypeOf<string>();
   expectTypeOf<Window['vectcut']['probeMedia']>().returns.resolves.toEqualTypeOf<{
     duration: number;

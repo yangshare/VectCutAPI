@@ -15,7 +15,7 @@ describe('App', () => {
     expect(html).toContain('生成导入');
     expect(html).toContain('模板 ID');
     expect(html).toContain('选择剪映草稿文件夹');
-    expect(html).toContain('导入并解析槽位');
+    expect(html).toContain('导入并解析轨道');
     expect(html).toContain('设置');
     expect(html).not.toContain('脚手架就绪');
   });
@@ -34,10 +34,11 @@ describe('App', () => {
     expect(generateImportSource).not.toContain(`${processToken}.`);
   });
 
-  it('keeps subtitles and cover titles in the material fill result through the wizard', () => {
+  it('keeps subtitles, text slots, and cover titles in the material fill result through the wizard', () => {
     expect(appSource).toContain('MaterialFillResult');
     expect(appSource).toContain('setMaterialFillResult');
     expect(appSource).toContain('subtitles={materialFillResult.subtitles}');
+    expect(appSource).toContain('textSlots={materialFillResult.textSlots}');
     expect(appSource).toContain('coverTitles={materialFillResult.coverTitles}');
   });
 

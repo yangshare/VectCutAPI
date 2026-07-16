@@ -28,7 +28,7 @@ class ImportTemplateRequest(BaseModel):
 class SlotConfig(BaseModel):
     """单个槽位配置：定义模板中某个轨道/片段对应的可替换槽位。
 
-    type 取值：video / audio / bgm / subtitle / cover_image / cover_title。
+    type 取值：video / audio / bgm / subtitle / text / cover_image / cover_title。
     """
 
     slot_id: str
@@ -36,6 +36,8 @@ class SlotConfig(BaseModel):
     type: str
     track_name: str
     segment_index: int
+    segment_indices: Optional[List[int]] = None
+    segment_count: Optional[int] = None
     locator: Optional[Dict[str, Any]] = None
     required: bool = True
 
@@ -62,6 +64,13 @@ class SubtitleMetadata(BaseModel):
 
     slot_id: str
     srt_content: str
+
+
+class TextSlotMetadata(BaseModel):
+    """手动文字轨元数据。text 直接替换模板文字片段内容。"""
+
+    slot_id: str
+    text: str
 
 
 class CoverTitleMetadata(BaseModel):

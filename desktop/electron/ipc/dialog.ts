@@ -1,6 +1,6 @@
 import { dialog } from 'electron';
-import { lstat, readFile, realpath, stat, writeFile } from 'fs/promises';
-import { extname } from 'path';
+import { lstat, readFile, readdir, realpath, stat, writeFile } from 'fs/promises';
+import { extname, join } from 'path';
 import type { IpcMain } from 'electron';
 
 export const VIDEO_EXTS = ['mp4', 'mov', 'avi', 'mkv', 'flv'];
@@ -19,6 +19,39 @@ export async function pickFile(name: string, extensions: string[]): Promise<stri
   });
 
   return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0];
+}
+
+export async function pickFiles(name: string, extensions: string[]): Promise<string[]> {
+  const result = await dialog.showOpenDialog({
+    title: `选择${name}`,
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name, extensions }],
+  });
+
+  return result.canceled ? [] : result.filePaths;
+}
+
+export async function selectVideoDirectory(): Promise<{
+  directory: string;
+  files: string[];
+} | null> {
+  const result = await dialog.showOpenDialog({
+    title: '选择视频素材目录',
+    properties: ['openDirectory'],
+  });
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+
+  const directory = await realpath(result.filePaths[0]);
+  const entries = await readdir(directory, { withFileTypes: true });
+  const supportedExtensions = new Set(VIDEO_EXTS.map((extension) => `.${extension}`));
+  const files = entries
+    .filter((entry) => entry.isFile() && supportedExtensions.has(extname(entry.name).toLowerCase()))
+    .map((entry) => join(directory, entry.name))
+    .sort((left, right) => left.localeCompare(right));
+
+  return { directory, files };
 }
 
 export async function selectSrtFile(): Promise<string | null> {
@@ -187,6 +220,8 @@ export async function writeZipFile(
 
 export function registerDialogHandlers(ipcMain: IpcMain): void {
   ipcMain.handle('dialog:selectVideoFile', () => pickFile('视频', VIDEO_EXTS));
+  ipcMain.handle('dialog:selectVideoFiles', () => pickFiles('视频', VIDEO_EXTS));
+  ipcMain.handle('dialog:selectVideoDirectory', () => selectVideoDirectory());
   ipcMain.handle('dialog:selectAudioFile', () => pickFile('音频', AUDIO_EXTS));
   ipcMain.handle('dialog:selectImageFile', () => pickFile('图片', IMAGE_EXTS));
   ipcMain.handle('dialog:selectSrtFile', () => selectSrtFile());

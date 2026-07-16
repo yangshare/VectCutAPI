@@ -20,6 +20,11 @@ const toArrayBuffer = (value: ArrayBuffer | Uint8Array): ArrayBuffer => {
 const api: VectCutApi = {
   // 文件/文件夹选择（dialog.ts）
   selectVideoFile: () => ipcRenderer.invoke('dialog:selectVideoFile') as Promise<string | null>,
+  selectVideoFiles: () => ipcRenderer.invoke('dialog:selectVideoFiles') as Promise<string[]>,
+  selectVideoDirectory: () => ipcRenderer.invoke('dialog:selectVideoDirectory') as Promise<{
+    directory: string;
+    files: string[];
+  } | null>,
   selectAudioFile: () => ipcRenderer.invoke('dialog:selectAudioFile') as Promise<string | null>,
   selectImageFile: () => ipcRenderer.invoke('dialog:selectImageFile') as Promise<string | null>,
   selectSrtFile: () => ipcRenderer.invoke('dialog:selectSrtFile') as Promise<string | null>,

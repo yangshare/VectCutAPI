@@ -19,6 +19,7 @@ class _MockSegment:
 class _MockTrack:
     def __init__(self, name: str, n_segs: int):
         self.name = name
+        self.track_id = name
         self.segments = [_MockSegment() for _ in range(n_segs)]
 
 
@@ -64,6 +65,11 @@ class TestResolveSlotToTrack:
         track = resolve_slot_to_track(script, slot)
         assert track.name == "text_subtitle"
 
+    def test_resolve_text_slot_maps_to_text_track(self, script):
+        slot = {"type": "text", "track_name": "text_subtitle"}
+        track = resolve_slot_to_track(script, slot)
+        assert track.name == "text_subtitle"
+
     def test_track_not_found_raises_slot_error(self, script):
         slot = {"type": "video", "track_name": "nonexistent"}
         with pytest.raises(SlotError, match="轨道不存在") as exc:
@@ -100,6 +106,23 @@ class TestResolveSlotToTrack:
             },
         }
         track = resolve_slot_to_track(script, slot)
+        assert track.name == "video_main"
+
+    def test_track_id_locator_survives_track_reordering(self, script):
+        script.tracks.reverse()
+        slot = {
+            "type": "video",
+            "track_name": "",
+            "locator": {
+                "scope": "root",
+                "track_index": 0,
+                "track_id": "video_main",
+                "segment_index": 0,
+            },
+        }
+
+        track = resolve_slot_to_track(script, slot)
+
         assert track.name == "video_main"
 
 
@@ -144,6 +167,20 @@ class TestResolveAllSlots:
         ]
         with pytest.raises(SlotError, match="越界") as exc:
             resolve_all_slots(script, slots)
+        assert exc.value.code == "S_SEGMENT_NOT_FOUND"
+
+    def test_resolve_all_validates_every_track_slot_segment_index(self, script):
+        slots = [{
+            "slot_id": "v1",
+            "type": "video",
+            "track_name": "video_main",
+            "segment_index": 0,
+            "segment_indices": [0, 99],
+        }]
+
+        with pytest.raises(SlotError) as exc:
+            resolve_all_slots(script, slots)
+
         assert exc.value.code == "S_SEGMENT_NOT_FOUND"
 
     @pytest.mark.parametrize(

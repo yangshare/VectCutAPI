@@ -51,7 +51,7 @@ export default function TemplateManager({ onTemplateImported }: TemplateManagerP
           导入母版
         </h2>
         <p style={{ margin: 0, color: '#475569' }}>
-          选择一个剪映草稿文件夹并设置模板 ID，客户端只读取 draft_content.json 并提交到服务端解析可替换槽位。
+          选择一个剪映草稿文件夹并设置模板 ID，系统会读取完整轨道清单供首次配置。
         </p>
       </div>
 
@@ -83,7 +83,7 @@ export default function TemplateManager({ onTemplateImported }: TemplateManagerP
 
         <div>
           <button type="button" onClick={handleImport} disabled={isLoading} style={primaryButtonStyle}>
-            {isLoading ? '正在导入...' : '导入并解析槽位'}
+            {isLoading ? '正在导入...' : '导入并解析轨道'}
           </button>
         </div>
       </div>

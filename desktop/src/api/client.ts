@@ -2,10 +2,11 @@ import axios, { type AxiosRequestConfig } from 'axios';
 import type {
   ApiEnvelope,
   CoverTitleMetadata,
-  MaterialMetadata,
+  MaterialSlotMetadata,
   Slot,
   SlotMapping,
   SubtitleMetadata,
+  TextSlotMetadata,
   UserConfig,
 } from '../types';
 import type { ApiError } from './errorMessages';
@@ -277,10 +278,12 @@ export async function saveSlotConfig(
       template_id: templateId,
       slots: slotMappings.map((slot) => ({
         slot_id: slot.slot_id,
-        name: slot.slot_id,
+        name: slot.name ?? slot.slot_id,
         type: slot.type,
         track_name: slot.track_name,
         segment_index: slot.segment_index,
+        ...(slot.segment_indices ? { segment_indices: slot.segment_indices } : {}),
+        ...(slot.segment_count ? { segment_count: slot.segment_count } : {}),
         ...(slot.locator ? { locator: slot.locator } : {}),
         required: true,
       })),
@@ -300,16 +303,17 @@ export async function saveSlotConfig(
 /** 根据槽位素材生成草稿任务。 */
 export async function renderDraft(
   templateId: string,
-  materials: MaterialMetadata[],
+  materials: MaterialSlotMetadata[],
   subtitles?: SubtitleMetadata[],
   coverTitles?: CoverTitleMetadata[],
+  textSlots?: TextSlotMetadata[],
 ): Promise<RenderDraftResult> {
   const output = await requestEnvelope<RenderDraftBackendResult>({
     method: 'post',
     url: '/api/template/render',
     data: {
       template_id: templateId,
-      slot_values: buildSlotValues(materials, subtitles, coverTitles),
+      slot_values: buildSlotValues(materials, subtitles, coverTitles, textSlots),
       output_draft_name: `${templateId}-${Date.now()}`,
     },
   });
@@ -387,9 +391,10 @@ export async function downloadDraft(taskId: string, savePath: string): Promise<s
 }
 
 function buildSlotValues(
-  materials: MaterialMetadata[],
+  materials: MaterialSlotMetadata[],
   subtitles?: SubtitleMetadata[],
   coverTitles?: CoverTitleMetadata[],
+  textSlots?: TextSlotMetadata[],
 ): Record<string, unknown> {
   const values: Record<string, unknown> = {};
 
@@ -403,6 +408,10 @@ function buildSlotValues(
 
   for (const coverTitle of coverTitles ?? []) {
     values[coverTitle.slot_id] = coverTitle;
+  }
+
+  for (const textSlot of textSlots ?? []) {
+    values[textSlot.slot_id] = textSlot;
   }
 
   return values;

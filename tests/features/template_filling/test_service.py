@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, List
@@ -456,7 +457,7 @@ def test_save_slot_config_success(fake_storage, fake_draft_module, tmp_path: Pat
     req = SaveSlotConfigRequest(
         template_id="tpl_y",
         slots=[SlotConfig(
-            slot_id="video_main_video_0",
+            slot_id="video_main_video",
             name="主视频", type="video",
             track_name="main_video", segment_index=0,
         )],
@@ -468,6 +469,8 @@ def test_save_slot_config_success(fake_storage, fake_draft_module, tmp_path: Pat
     assert resp.slot_count == 1
     # state 中应当保存
     assert "tpl_y" in fake_storage["slots"]
+    assert fake_storage["slots"]["tpl_y"][0]["segment_indices"] == [0]
+    assert fake_storage["slots"]["tpl_y"][0]["name"] == "主视频"
 
 
 @pytest.mark.parametrize("operation", ["render_draft", "save_slot_config"])
@@ -559,7 +562,7 @@ def test_template_read_operations_wait_for_import_template_lock(
                     template_id=template_id,
                     slots=[
                         SlotConfig(
-                            slot_id="video_main_video_0",
+                            slot_id="video_main_video",
                             name="主视频",
                             type="video",
                             track_name="main_video",
@@ -1252,6 +1255,70 @@ def test_render_draft_subtitle_imports_srt_without_warning(
     assert resp.draft_id in fake_storage["drafts"]
 
 
+def test_render_draft_text_value_replaces_existing_text_material(
+    fake_storage, fake_draft_module, monkeypatch, tmp_path: Path
+):
+    """subtitle/text 槽位传 text 时，应替换原文字素材而不是导入 SRT。"""
+    zip_path = tmp_path / "src.zip"
+    zip_path.write_bytes(b"PK\x03\x04")
+    service.import_template("tpl_text_value", str(zip_path))
+
+    fake_storage["slots"]["tpl_text_value"] = [
+        {
+            "slot_id": "subtitle_title_0",
+            "type": "subtitle",
+            "track_name": "subtitle_track",
+            "segment_index": 0,
+            "segment_indices": [0],
+            "segment_count": 1,
+        }
+    ]
+    text_track = _make_track(_FakeTrackType("text"), "subtitle_track", seg_count=1)
+    text_track.segments[0].material_id = "text-material-1"
+    script = _make_fake_script(
+        [text_track],
+        import_srt=lambda *a, **k: pytest.fail("text value should not import SRT"),
+    )
+    script.imported_materials = {
+        "texts": [
+            {
+                "id": "text-material-1",
+                "content": json.dumps(
+                    {"text": "旧标题", "styles": [{"range": [0, 3]}]},
+                    ensure_ascii=False,
+                ),
+                "base_content": "旧标题",
+                "words": {"end_time": [1], "start_time": [0], "text": ["旧标题"]},
+            }
+        ],
+        "text_templates": [],
+    }
+
+    monkeypatch.setattr(service.draft.Script_file, "load_template", lambda _path: script)
+
+    from vectcut.features.template_filling.schemas import RenderDraftRequest
+
+    req = RenderDraftRequest(
+        template_id="tpl_text_value",
+        slot_values={
+            "subtitle_title_0": {
+                "slot_id": "subtitle_title_0",
+                "text": "新标题",
+            }
+        },
+        output_draft_name="out",
+    )
+    resp = service.render_draft("tpl_text_value", req)
+
+    text_material = script.imported_materials["texts"][0]
+    parsed_content = json.loads(text_material["content"])
+    assert isinstance(resp, RenderDraftResponse)
+    assert parsed_content["text"] == "新标题"
+    assert parsed_content["styles"] == [{"range": [0, 3]}]
+    assert text_material["base_content"] == "新标题"
+    assert text_material["words"] == {"end_time": [], "start_time": [], "text": []}
+
+
 def test_import_subtitle_srt_clears_old_segments_before_import_and_replaces_them():
     """字幕替换应先清空旧段，import_srt 成功后旧字幕段不应残留。"""
     track = _make_track(_FakeTrackType("text"), "subtitle_track", seg_count=2)
@@ -1283,6 +1350,73 @@ def test_import_subtitle_srt_clears_old_segments_before_import_and_replaces_them
     assert observed["style_reference"] is old_style_reference
     assert observed["clip_settings"] is None
     assert track.segments == [new_segment]
+
+
+def test_parse_srt_entries_accepts_utf8_bom():
+    """Windows/剪映常见的 UTF-8 BOM 不应破坏首行字幕序号。"""
+    entries = service._parse_srt_entries(
+        "subtitle_bom",
+        "\ufeff1\n00:00:00,108 --> 00:00:00,771\n我叫冉维壹\n",
+    )
+
+    assert entries == [(0.108, 0.771, "我叫冉维壹")]
+
+
+def test_import_subtitle_srt_targets_each_raw_track_when_names_are_empty():
+    """同名（含空名）文本轨道必须按已解析的轨道对象分别替换。"""
+    from pyJianYingDraft.template_mode import ImportedSegment
+
+    def _raw_segment(material_id: str, segment_id: str) -> ImportedSegment:
+        return ImportedSegment({
+            "id": segment_id,
+            "material_id": material_id,
+            "target_timerange": {"start": 0, "duration": 1_000_000},
+            "common_keyframes": [],
+        })
+
+    def _text_material(material_id: str, text: str) -> Dict[str, Any]:
+        return {
+            "id": material_id,
+            "content": '{"text":"%s","styles":[{"range":[0,%d]}]}' % (text, len(text)),
+            "base_content": text,
+            "words": {"end_time": [], "start_time": [], "text": []},
+        }
+
+    first_track = SimpleNamespace(name="", segments=[_raw_segment("mat-1", "seg-1")])
+    second_track = SimpleNamespace(name="", segments=[_raw_segment("mat-2", "seg-2")])
+    script = SimpleNamespace(
+        imported_materials={
+            "texts": [_text_material("mat-1", "old one"), _text_material("mat-2", "old two")],
+        },
+        import_srt=lambda *_args, **_kwargs: pytest.fail("raw 轨道不应走按名称导入"),
+    )
+
+    service._import_subtitle_srt(
+        script,
+        first_track,
+        {"slot_id": "subtitle_first", "segment_index": 0},
+        {"srt_content": "1\n00:00:00,000 --> 00:00:01,000\nfirst\n"},
+    )
+    service._import_subtitle_srt(
+        script,
+        second_track,
+        {"slot_id": "subtitle_second", "segment_index": 0},
+        {"srt_content": (
+            "1\n00:00:00,000 --> 00:00:01,000\nsecond A\n\n"
+            "2\n00:00:01,000 --> 00:00:02,500\nsecond B\n"
+        )},
+    )
+
+    assert len(first_track.segments) == 1
+    assert len(second_track.segments) == 2
+    assert first_track.segments[0].material_id != second_track.segments[0].material_id
+    materials_by_id = {item["id"]: item for item in script.imported_materials["texts"]}
+    assert materials_by_id[first_track.segments[0].material_id]["base_content"] == "first"
+    assert [
+        materials_by_id[segment.material_id]["base_content"]
+        for segment in second_track.segments
+    ] == ["second A", "second B"]
+    assert second_track.segments[1].target_timerange.duration == 1_500_000
 
 
 def test_render_draft_subtitle_invalid_srt_maps_to_render_error(
@@ -1843,19 +1977,22 @@ def test_scan_slots_classifies_track_types():
     slots = service._scan_slots_from_template(script)
 
     types = [s["type"] for s in slots]
-    # video × 2 seg + bgm(bgm_track) × 1 + audio(voiceover) × 1 + subtitle(lyrics) × 1 = 5
-    assert types.count("video") == 2
+    # 每条轨道只生成一个业务槽位，视频轨内部保留两个片段索引。
+    assert types.count("video") == 1
     assert types.count("bgm") == 1
     assert types.count("audio") == 1
     assert types.count("subtitle") == 1
-    # sticker 类型应当被跳过
-    assert "sticker" not in types
+    # 系统轨仍返回给配置页展示，但不允许作为替换槽位。
+    sticker_slot = next(s for s in slots if s["type"] == "sticker")
+    assert sticker_slot["replaceable"] is False
 
     # slot_id 格式
     video_slot = next(s for s in slots if s["type"] == "video")
-    assert video_slot["slot_id"] == "video_main_video_0"
+    assert video_slot["slot_id"] == "video_main_video"
     assert video_slot["segment_index"] == 0
-    assert video_slot["name"] == "video槽位0"
+    assert video_slot["segment_indices"] == [0, 1]
+    assert video_slot["segment_count"] == 2
+    assert video_slot["name"] == "视频轨 1"
 
 
 def test_scan_slots_reads_imported_tracks_when_tracks_is_empty():
@@ -1870,10 +2007,9 @@ def test_scan_slots_reads_imported_tracks_when_tracks_is_empty():
     slots = service._scan_slots_from_template(script)
 
     assert [s["slot_id"] for s in slots] == [
-        "video_real_video_0",
-        "video_real_video_1",
-        "bgm_real_bgm_0",
-        "subtitle_real_subtitle_0",
+        "video_real_video",
+        "bgm_real_bgm",
+        "subtitle_real_subtitle",
     ]
 
 
@@ -1888,8 +2024,8 @@ def test_scan_slots_accepts_tracks_dict_values():
     slots = service._scan_slots_from_template(script)
 
     assert [s["slot_id"] for s in slots] == [
-        "video_dict_video_0",
-        "subtitle_dict_subtitle_0",
+        "video_dict_video",
+        "subtitle_dict_subtitle",
     ]
 
 
@@ -1905,8 +2041,8 @@ def test_scan_slots_deduplicates_tracks_and_imported_tracks():
     slots = service._scan_slots_from_template(script)
 
     assert [s["slot_id"] for s in slots] == [
-        "video_shared_video_0",
-        "bgm_shared_bgm_0",
+        "video_shared_video",
+        "bgm_shared_bgm",
     ]
 
 
@@ -1923,16 +2059,355 @@ def test_scan_slots_uses_locator_for_empty_track_names():
     slots = service._scan_slots_from_template(script)
 
     assert [s["slot_id"] for s in slots] == [
-        "video_track0_seg0",
-        "video_track0_seg1",
-        "video_track1_seg0",
-        "audio_track2_seg0",
-        "subtitle_track3_seg0",
+        "video_track0",
+        "video_track1",
+        "audio_track2",
+        "subtitle_track3",
     ]
     assert all("locator" in slot for slot in slots)
     assert slots[2]["track_name"] == ""
-    assert slots[2]["locator"]["track_index"] == 1
+    assert slots[2]["locator"]["track_index"] == 2
     assert slots[2]["locator"]["segment_index"] == 0
+
+
+def test_scan_slots_returns_every_text_track_without_recommending_one():
+    tracks = [
+        _make_track(_FakeTrackType("text"), "brand", seg_count=1),
+        _make_track(_FakeTrackType("text"), "disclaimer", seg_count=2),
+        _make_track(_FakeTrackType("text"), "main_subtitle", seg_count=50),
+    ]
+
+    slots = service._scan_slots_from_template(_make_fake_script(tracks))
+
+    assert [slot["slot_id"] for slot in slots] == [
+        "subtitle_brand",
+        "subtitle_disclaimer",
+        "subtitle_main_subtitle",
+    ]
+    assert [slot["segment_count"] for slot in slots] == [1, 2, 50]
+    assert all(slot["selected"] is False for slot in slots)
+
+
+def test_scan_slots_extracts_text_content_preview():
+    track = _make_track(_FakeTrackType("text"), "subtitle", seg_count=2)
+    track.segments[0].material_id = "text-1"
+    track.segments[1].material_id = "text-2"
+    script = _make_fake_script([track])
+    script.imported_materials = {
+        "texts": [
+            {"id": "text-1", "content": '{"text":"第一句字幕"}'},
+            {"id": "text-2", "content": '{"text":"第二句字幕"}'},
+        ]
+    }
+
+    slots = service._scan_slots_from_template(script)
+
+    assert slots[0]["content_preview"] == "第一句字幕 / 第二句字幕"
+
+
+def test_import_template_restores_only_saved_user_selections(
+    fake_storage, fake_draft_module, tmp_path: Path
+):
+    fake_storage["slots"]["tpl_saved"] = [
+        {"slot_id": "video_main_video", "locator": {}},
+        {"slot_id": "subtitle_subtitle_track", "locator": {}},
+    ]
+    zip_path = tmp_path / "src.zip"
+    zip_path.write_bytes(b"PK\x03\x04")
+
+    response = service.import_template("tpl_saved", str(zip_path))
+
+    selected_ids = {slot["slot_id"] for slot in response.slots if slot["selected"]}
+    assert selected_ids == {"video_main_video", "subtitle_subtitle_track"}
+
+
+def test_save_slot_config_rejects_non_replaceable_system_track(
+    fake_storage, monkeypatch, tmp_path: Path
+):
+    effect_track = _make_track(_FakeTrackType("effect"), "spark", seg_count=1)
+    script = _make_fake_script([effect_track])
+    monkeypatch.setattr(service.draft.Script_file, "load_template", lambda _path: script)
+    zip_path = tmp_path / "src.zip"
+    zip_path.write_bytes(b"PK\x03\x04")
+    service.import_template("tpl_effect", str(zip_path))
+    from vectcut.features.template_filling.schemas import SaveSlotConfigRequest
+
+    request = SaveSlotConfigRequest(
+        template_id="tpl_effect",
+        slots=[SlotConfig(
+            slot_id="effect_spark",
+            name="特效轨 1",
+            type="effect",
+            track_name="spark",
+            segment_index=0,
+        )],
+    )
+
+    with pytest.raises(SlotError) as exc:
+        service.save_slot_config("tpl_effect", request)
+
+    assert exc.value.code == "S_TYPE_MISMATCH"
+
+
+def test_save_slot_config_allows_single_text_track_type_override(
+    fake_storage, monkeypatch, tmp_path: Path
+):
+    text_track = _make_track(_FakeTrackType("text"), "title", seg_count=1)
+    script = _make_fake_script([text_track])
+    monkeypatch.setattr(service.draft.Script_file, "load_template", lambda _path: script)
+    zip_path = tmp_path / "src.zip"
+    zip_path.write_bytes(b"PK\x03\x04")
+    service.import_template("tpl_text_config", str(zip_path))
+    from vectcut.features.template_filling.schemas import SaveSlotConfigRequest
+
+    request = SaveSlotConfigRequest(
+        template_id="tpl_text_config",
+        slots=[SlotConfig(
+            slot_id="subtitle_title",
+            name="文字轨 1",
+            type="text",
+            track_name="title",
+            segment_index=0,
+        )],
+    )
+
+    service.save_slot_config("tpl_text_config", request)
+
+    assert fake_storage["slots"]["tpl_text_config"][0]["type"] == "text"
+
+
+def test_render_track_video_slot_replaces_each_segment_in_order(
+    fake_storage, monkeypatch, tmp_path: Path
+):
+    video_track = _make_track(_FakeTrackType("video"), "", seg_count=2)
+    replace_calls: list[Any] = []
+    script = _make_fake_script(
+        [video_track],
+        replace_material_by_seg=lambda *args: replace_calls.append(args),
+    )
+    monkeypatch.setattr(service.draft.Script_file, "load_template", lambda _path: script)
+    zip_path = tmp_path / "src.zip"
+    zip_path.write_bytes(b"PK\x03\x04")
+    service.import_template("tpl_video_track", str(zip_path))
+    fake_storage["slots"]["tpl_video_track"] = [
+        {
+            "slot_id": "video_track0",
+            "type": "video",
+            "track_name": "",
+            "segment_index": 0,
+            "segment_indices": [0, 1],
+            "segment_count": 2,
+            "locator": {
+                "scope": "root",
+                "track_index": 0,
+                "track_type": "video",
+                "segment_index": 0,
+            },
+        }
+    ]
+    from vectcut.features.template_filling.schemas import RenderDraftRequest
+
+    req = RenderDraftRequest(
+        template_id="tpl_video_track",
+        slot_values={
+            "video_track0": {
+                "materials": [
+                    {"path": "G:/clips/001.mp4", "duration": 3, "width": 1080, "height": 1920},
+                    {"path": "G:/clips/002.mp4", "duration": 4, "width": 1080, "height": 1920},
+                ]
+            }
+        },
+        output_draft_name="out",
+    )
+
+    service.render_draft("tpl_video_track", req)
+
+    assert [call[1] for call in replace_calls] == [0, 1]
+    assert [call[2].material_name for call in replace_calls] == ["001.mp4", "002.mp4"]
+
+
+def test_render_track_video_slot_accepts_material_count_different_from_template(
+    fake_storage, monkeypatch, tmp_path: Path
+):
+    video_track = _make_track(_FakeTrackType("video"), "", seg_count=2)
+    script = _make_fake_script([video_track])
+    monkeypatch.setattr(service.draft.Script_file, "load_template", lambda _path: script)
+    zip_path = tmp_path / "src.zip"
+    zip_path.write_bytes(b"PK\x03\x04")
+    service.import_template("tpl_video_count", str(zip_path))
+    fake_storage["slots"]["tpl_video_count"] = [
+        {
+            "slot_id": "video_track0",
+            "type": "video",
+            "track_name": "",
+            "segment_index": 0,
+            "segment_indices": [0, 1],
+            "locator": {
+                "scope": "root",
+                "track_index": 0,
+                "track_type": "video",
+                "segment_index": 0,
+            },
+        }
+    ]
+    from vectcut.features.template_filling.schemas import RenderDraftRequest
+
+    req = RenderDraftRequest(
+        template_id="tpl_video_count",
+        slot_values={
+            "video_track0": {
+                "materials": [
+                    {"path": "G:/clips/001.mp4", "duration": 3, "width": 1080, "height": 1920},
+                ]
+            }
+        },
+        output_draft_name="out",
+    )
+
+    response = service.render_draft("tpl_video_count", req)
+
+    assert isinstance(response, RenderDraftResponse)
+    assert len(video_track.segments) == 1
+    assert video_track.segments[0].target_timerange == service.draft.Timerange(0, 3_000_000)
+
+
+def test_render_track_video_slot_rebuilds_to_audio_duration(
+    fake_storage, monkeypatch, tmp_path: Path
+):
+    video_track = _make_track(_FakeTrackType("video"), "", seg_count=2)
+    audio_track = _make_track(_FakeTrackType("audio"), "", seg_count=1)
+    replace_calls: list[Any] = []
+    script = _make_fake_script(
+        [video_track, audio_track],
+        replace_material_by_seg=lambda *args: replace_calls.append(args),
+    )
+    monkeypatch.setattr(service.draft.Script_file, "load_template", lambda _path: script)
+    zip_path = tmp_path / "src.zip"
+    zip_path.write_bytes(b"PK\x03\x04")
+    service.import_template("tpl_video_audio_target", str(zip_path))
+    fake_storage["slots"]["tpl_video_audio_target"] = [
+        {
+            "slot_id": "video_track0",
+            "type": "video",
+            "track_name": "",
+            "segment_index": 0,
+            "segment_indices": [0, 1],
+            "locator": {
+                "scope": "root",
+                "track_index": 0,
+                "track_type": "video",
+                "segment_index": 0,
+            },
+        },
+        {
+            "slot_id": "audio_track1",
+            "type": "audio",
+            "track_name": "",
+            "segment_index": 0,
+            "locator": {
+                "scope": "root",
+                "track_index": 1,
+                "track_type": "audio",
+                "segment_index": 0,
+            },
+        },
+    ]
+    from vectcut.features.template_filling.schemas import RenderDraftRequest
+
+    req = RenderDraftRequest(
+        template_id="tpl_video_audio_target",
+        slot_values={
+            "video_track0": {
+                "materials": [
+                    {"path": "G:/clips/001.mp4", "duration": 3, "width": 1080, "height": 1920},
+                    {"path": "G:/clips/002.mp4", "duration": 4, "width": 1080, "height": 1920},
+                    {"path": "G:/clips/003.mp4", "duration": 5, "width": 1080, "height": 1920},
+                ]
+            },
+            "audio_track1": {"path": "G:/voice.mp3", "duration": 10},
+        },
+        output_draft_name="out",
+    )
+
+    service.render_draft("tpl_video_audio_target", req)
+
+    assert len(video_track.segments) == 3
+    assert [segment.target_timerange.start for segment in video_track.segments] == [
+        0,
+        3_000_000,
+        7_000_000,
+    ]
+    assert [segment.target_timerange.duration for segment in video_track.segments] == [
+        3_000_000,
+        4_000_000,
+        3_000_000,
+    ]
+    assert audio_track.segments[0].target_timerange.duration == 10_000_000
+    assert script.duration == 10_000_000
+    assert [call[2].material_name for call in replace_calls[:3]] == [
+        "001.mp4",
+        "002.mp4",
+        "003.mp4",
+    ]
+
+
+def test_render_track_video_slot_rejects_directory_shorter_than_audio(
+    fake_storage, monkeypatch, tmp_path: Path
+):
+    video_track = _make_track(_FakeTrackType("video"), "", seg_count=2)
+    audio_track = _make_track(_FakeTrackType("audio"), "", seg_count=1)
+    script = _make_fake_script([video_track, audio_track])
+    monkeypatch.setattr(service.draft.Script_file, "load_template", lambda _path: script)
+    zip_path = tmp_path / "src.zip"
+    zip_path.write_bytes(b"PK\x03\x04")
+    service.import_template("tpl_video_short", str(zip_path))
+    fake_storage["slots"]["tpl_video_short"] = [
+        {
+            "slot_id": "video_track0",
+            "type": "video",
+            "track_name": "",
+            "segment_index": 0,
+            "locator": {
+                "scope": "root",
+                "track_index": 0,
+                "track_type": "video",
+                "segment_index": 0,
+            },
+        },
+        {
+            "slot_id": "audio_track1",
+            "type": "audio",
+            "track_name": "",
+            "segment_index": 0,
+            "locator": {
+                "scope": "root",
+                "track_index": 1,
+                "track_type": "audio",
+                "segment_index": 0,
+            },
+        },
+    ]
+    from vectcut.features.template_filling.schemas import RenderDraftRequest
+
+    req = RenderDraftRequest(
+        template_id="tpl_video_short",
+        slot_values={
+            "video_track0": {
+                "materials": [
+                    {"path": "G:/clips/001.mp4", "duration": 3, "width": 1080, "height": 1920},
+                    {"path": "G:/clips/002.mp4", "duration": 4, "width": 1080, "height": 1920},
+                ]
+            },
+            "audio_track1": {"path": "G:/voice.mp3", "duration": 10},
+        },
+        output_draft_name="out",
+    )
+
+    with pytest.raises(RenderError) as exc:
+        service.render_draft("tpl_video_short", req)
+
+    assert exc.value.code == "R_VIDEO_DURATION_SHORT"
+    assert exc.value.details["shortage"] == 3
 
 
 def test_render_draft_uses_locator_when_track_name_is_empty(
@@ -1988,3 +2463,83 @@ def test_render_draft_uses_locator_when_track_name_is_empty(
 
     assert resp.draft_id.startswith("draft_")
     assert replace_calls[0][0] is video_track
+
+
+def test_render_draft_aligns_non_media_tracks_to_audio_duration(
+    fake_storage, monkeypatch, tmp_path: Path
+):
+    video_track = _make_track(_FakeTrackType("video"), "", seg_count=2)
+    audio_track = _make_track(_FakeTrackType("audio"), "", seg_count=1)
+    text_track = _make_track(_FakeTrackType("text"), "title", seg_count=1)
+    effect_track = _make_track(_FakeTrackType("effect"), "effect", seg_count=1)
+    adjust_track = _make_track(_FakeTrackType("adjust"), "adjust", seg_count=1)
+    effect_track.segments[0].target_timerange = SimpleNamespace(
+        start=4_000_000,
+        duration=1_000_000,
+    )
+
+    script = _make_fake_script([
+        video_track,
+        audio_track,
+        text_track,
+        effect_track,
+        adjust_track,
+    ])
+    monkeypatch.setattr(service.draft.Script_file, "load_template", lambda _path: script)
+    zip_path = tmp_path / "src.zip"
+    zip_path.write_bytes(b"PK\x03\x04")
+    service.import_template("tpl_align_overlays", str(zip_path))
+    fake_storage["slots"]["tpl_align_overlays"] = [
+        {
+            "slot_id": "video_track0",
+            "type": "video",
+            "track_name": "",
+            "segment_index": 0,
+            "segment_indices": [0, 1],
+            "locator": {
+                "scope": "root",
+                "track_index": 0,
+                "track_type": "video",
+                "segment_index": 0,
+            },
+        },
+        {
+            "slot_id": "audio_track1",
+            "type": "audio",
+            "track_name": "",
+            "segment_index": 0,
+            "locator": {
+                "scope": "root",
+                "track_index": 1,
+                "track_type": "audio",
+                "segment_index": 0,
+            },
+        },
+    ]
+
+    from vectcut.features.template_filling.schemas import RenderDraftRequest
+
+    req = RenderDraftRequest(
+        template_id="tpl_align_overlays",
+        slot_values={
+            "video_track0": {
+                "materials": [
+                    {"path": "G:/clips/001.mp4", "duration": 3, "width": 1080, "height": 1920},
+                    {"path": "G:/clips/002.mp4", "duration": 4, "width": 1080, "height": 1920},
+                    {"path": "G:/clips/003.mp4", "duration": 5, "width": 1080, "height": 1920},
+                ]
+            },
+            "audio_track1": {"path": "G:/voice.mp3", "duration": 10},
+        },
+        output_draft_name="out",
+    )
+
+    service.render_draft("tpl_align_overlays", req)
+
+    assert audio_track.segments[0].target_timerange.duration == 10_000_000
+    assert sum(segment.target_timerange.duration for segment in video_track.segments) == 10_000_000
+    assert text_track.segments[0].target_timerange.duration == 10_000_000
+    assert effect_track.segments[0].target_timerange.start == 4_000_000
+    assert effect_track.segments[0].target_timerange.duration == 6_000_000
+    assert adjust_track.segments[0].target_timerange.duration == 10_000_000
+    assert script.duration == 10_000_000

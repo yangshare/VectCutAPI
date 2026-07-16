@@ -18,6 +18,7 @@ from vectcut.features.template_filling.schemas import (
     SaveSlotConfigResponse,
     SlotConfig,
     SubtitleMetadata,
+    TextSlotMetadata,
 )
 
 
@@ -63,6 +64,21 @@ def test_slot_config_required_false():
         required=False,
     )
     assert s.required is False
+
+
+def test_slot_config_accepts_track_segment_group():
+    s = SlotConfig(
+        slot_id="video_track0",
+        name="主视频",
+        type="video",
+        track_name="",
+        segment_index=0,
+        segment_indices=[0, 1, 2],
+        segment_count=3,
+    )
+
+    assert s.segment_indices == [0, 1, 2]
+    assert s.segment_count == 3
 
 
 def test_slot_config_missing_required_field_raises():
@@ -145,6 +161,19 @@ def test_subtitle_metadata_valid():
 def test_subtitle_metadata_missing_srt_raises():
     with pytest.raises(ValidationError):
         SubtitleMetadata(slot_id="s_sub")
+
+
+# ---------------- TextSlotMetadata ----------------
+
+def test_text_slot_metadata_valid():
+    t = TextSlotMetadata(slot_id="s_text", text="每次生成替换")
+    assert t.slot_id == "s_text"
+    assert t.text == "每次生成替换"
+
+
+def test_text_slot_metadata_missing_text_raises():
+    with pytest.raises(ValidationError):
+        TextSlotMetadata(slot_id="s_text")
 
 
 # ---------------- CoverTitleMetadata ----------------

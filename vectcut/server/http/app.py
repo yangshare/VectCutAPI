@@ -16,6 +16,7 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.middleware.cors import CORSMiddleware
 
 from vectcut import __version__
 from vectcut.core.config import load_config
@@ -176,6 +177,19 @@ def _wire_exception_handlers(app: FastAPI) -> FastAPI:
     """
 
     app.add_middleware(_TemplateImportBodyLimitMiddleware)
+
+    # CORS：放行跨域请求（桌面客户端渲染进程 origin 与本地服务端口不同源）。
+    # 必须在 body-limit 之后 add → 成为最外层：OPTIONS 预检由它直接处理，
+    # 且 body-limit 返回的"过大"错误响应也能被它补上 CORS 头，否则前端同样读不到。
+    # axios Basic Auth 发送 Authorization 头，使请求变为"需预检请求"，
+    # allow_headers 含 authorization 才能让预检通过（否则浏览器阻断 → Network Error）。
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+        allow_credentials=False,
+    )
 
     @app.exception_handler(VectCutError)
     async def _vectcut_error_handler(_req: Request, exc: VectCutError):

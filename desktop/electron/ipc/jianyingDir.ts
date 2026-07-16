@@ -9,6 +9,14 @@ import { getUserConfig } from './configStore';
 import type { UserConfig } from '../../src/types';
 
 const execFileAsync = promisify(execFile);
+const importZipEnvKey = 'VECTCUT_IMPORT_ZIP_PATH';
+const importDestinationEnvKey = 'VECTCUT_IMPORT_DESTINATION_PATH';
+const importDraftPowerShellCommand = [
+  "$ErrorActionPreference = 'Stop'",
+  "$ProgressPreference = 'SilentlyContinue'",
+  `Expand-Archive -LiteralPath $env:${importZipEnvKey} -DestinationPath $env:${importDestinationEnvKey} -Force`,
+].join('; ');
+const encodedImportDraftPowerShellCommand = Buffer.from(importDraftPowerShellCommand, 'utf16le').toString('base64');
 
 export function detectDraftDir(): string | null {
   const candidate =
@@ -123,14 +131,22 @@ export async function importDraft(zipPath: string, draftDir: string): Promise<{ 
   const targetDir = await createUniqueDraftDir(draftDir, zipBaseName);
 
   if (process.platform === 'win32') {
-    await execFileAsync('powershell.exe', [
-      '-NoProfile',
-      '-NonInteractive',
-      '-Command',
-      'Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force',
-      zipPath,
-      targetDir,
-    ]);
+    await execFileAsync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-EncodedCommand',
+        encodedImportDraftPowerShellCommand,
+      ],
+      {
+        env: {
+          ...process.env,
+          [importZipEnvKey]: zipPath,
+          [importDestinationEnvKey]: targetDir,
+        },
+      },
+    );
   } else {
     await execFileAsync('unzip', ['-o', zipPath, '-d', targetDir]);
   }

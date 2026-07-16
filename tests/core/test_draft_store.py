@@ -64,6 +64,37 @@ def test_write_profile_content_updates_main_mirrors_and_timeline(tmp_path):
     assert layout["dockItems"][0]["timelineIds"] == ["timeline-fixed"]
 
 
+def test_write_profile_content_falls_back_when_windows_denies_timeline_rename(
+    tmp_path, monkeypatch
+):
+    from vectcut.core.draft_store import get_draft_profile, write_profile_content
+
+    draft_dir = tmp_path / "draft"
+    timeline_dir = draft_dir / "Timelines" / "timeline-1"
+    timeline_dir.mkdir(parents=True)
+    (timeline_dir / "attachment_editing.json").write_text("{}", encoding="utf-8")
+    (draft_dir / "timeline_layout.json").write_text(
+        json.dumps({"dockItems": [{"timelineIds": ["timeline-1"]}]}),
+        encoding="utf-8",
+    )
+
+    def _deny_rename(_self, _target):
+        raise PermissionError("denied")
+
+    monkeypatch.setattr(Path, "rename", _deny_rename)
+
+    write_profile_content(
+        get_draft_profile("jianying_pro_10"),
+        draft_dir,
+        json.dumps({"id": "timeline-fixed", "tracks": [], "materials": {}}),
+    )
+
+    renamed = draft_dir / "Timelines" / "timeline-fixed"
+    assert renamed.is_dir()
+    assert (renamed / "attachment_editing.json").is_file()
+    assert not timeline_dir.exists()
+
+
 def test_script_dumps_uses_requested_profile_platform_and_mask_key():
     import pyJianYingDraft as draft
     from vectcut.core.draft_store import get_draft_profile

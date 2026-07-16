@@ -208,6 +208,7 @@ describe('api client', () => {
       ],
       [{ slot_id: 'subtitle_1', srt_content: '1\n00:00:00,000 --> 00:00:01,000\nHi' }],
       [{ slot_id: 'cover_title_1', text: '标题' }],
+      [{ slot_id: 'text_title_1', text: '手动文字' }],
     );
 
     expect(result).toEqual({
@@ -237,6 +238,7 @@ describe('api client', () => {
           srt_content: '1\n00:00:00,000 --> 00:00:01,000\nHi',
         },
         cover_title_1: { slot_id: 'cover_title_1', text: '标题' },
+        text_title_1: { slot_id: 'text_title_1', text: '手动文字' },
       },
       output_draft_name: expect.any(String),
     });
@@ -250,7 +252,15 @@ describe('api client', () => {
     });
 
     const result = await saveSlotConfig('tpl-1', [
-      { slot_id: 'video-1', type: 'video', track_name: 'Video', segment_index: 0 },
+      {
+        slot_id: 'video-1',
+        name: '主视频',
+        type: 'video',
+        track_name: 'Video',
+        segment_index: 0,
+        segment_indices: [0, 1],
+        segment_count: 2,
+      },
       { slot_id: 'audio-1', type: 'audio', track_name: 'Audio', segment_index: 1 },
     ]);
 
@@ -263,10 +273,12 @@ describe('api client', () => {
         slots: [
           {
             slot_id: 'video-1',
-            name: 'video-1',
+            name: '主视频',
             type: 'video',
             track_name: 'Video',
             segment_index: 0,
+            segment_indices: [0, 1],
+            segment_count: 2,
             required: true,
           },
           {
@@ -280,6 +292,29 @@ describe('api client', () => {
         ],
       },
     }));
+  });
+
+  it('keeps grouped video materials under one track slot value', async () => {
+    const { renderDraft } = await import('../../src/api/client');
+    axiosRequest.mockResolvedValueOnce({
+      data: {
+        success: true,
+        output: { draft_id: 'draft-track', download_url: '/download/track', warnings: [] },
+        error: null,
+      },
+    });
+    const videoTrack = {
+      slot_id: 'video_track0',
+      materials: [
+        { path: 'D:\\media\\001.mp4', duration: 2, width: 1080, height: 1920 },
+        { path: 'D:\\media\\002.mp4', duration: 3, width: 1080, height: 1920 },
+      ],
+    };
+
+    await renderDraft('tpl-track', [videoTrack]);
+
+    const request = axiosRequest.mock.calls[0][0] as AxiosRequestConfig;
+    expect(request.data.slot_values).toEqual({ video_track0: videoTrack });
   });
 
   it('throws response format errors when slot config output has no count', async () => {
@@ -499,8 +534,10 @@ describe('api client', () => {
     expect(source).toContain('export interface SubtitleMetadata');
     expect(source).toContain('slot_id: string;');
     expect(source).toContain('srt_content: string;');
+    expect(source).toContain('export interface TextSlotMetadata');
     expect(source).toContain('export interface CoverTitleMetadata');
     expect(source).toContain('text: string;');
+    expect(source).toContain('text');
     expect(source).toContain('cover_image');
     expect(source).toContain('cover_title');
     expect(source).not.toContain('start_time: number;');

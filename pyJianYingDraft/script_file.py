@@ -731,10 +731,16 @@ class Script_file:
 
         return self
 
-    def replace_material_by_seg(self, track: EditableTrack, segment_index: int, material: Union[Video_material, Audio_material],
-                                source_timerange: Optional[Timerange] = None, *,
-                                handle_shrink: Shrink_mode = Shrink_mode.cut_tail,
-                                handle_extend: Union[Extend_mode, List[Extend_mode]] = Extend_mode.cut_material_tail) -> "Script_file":
+    def replace_material_by_seg(
+        self,
+        track: Union[EditableTrack, Track],
+        segment_index: int,
+        material: Union[Video_material, Audio_material],
+        source_timerange: Optional[Timerange] = None,
+        *,
+        handle_shrink: Shrink_mode = Shrink_mode.cut_tail,
+        handle_extend: Union[Extend_mode, List[Extend_mode]] = Extend_mode.cut_material_tail,
+    ) -> "Script_file":
         """替换指定音视频轨道上指定片段的素材, 暂不支持变速片段的素材替换
 
         Args:
@@ -751,6 +757,41 @@ class Script_file:
             `TypeError`: 轨道或素材类型不正确
             `ExtensionFailed`: 新素材比原素材长时处理失败
         """
+        if isinstance(track, Track):
+            if not 0 <= segment_index < len(track.segments):
+                raise IndexError("片段下标 %d 超出 [0, %d) 的范围" % (segment_index, len(track.segments)))
+            segment = track.segments[segment_index]
+            is_video = track.track_type == Track_type.video and isinstance(material, Video_material)
+            is_audio = track.track_type == Track_type.audio and isinstance(material, Audio_material)
+            if not is_video and not is_audio:
+                raise TypeError("指定的素材类型 %s 不匹配轨道类型 %s" % (type(material), track.track_type))
+            if is_video and not isinstance(segment, Video_segment):
+                raise TypeError("视频轨道片段类型不支持素材替换: %s" % type(segment))
+            if is_audio and not isinstance(segment, Audio_segment):
+                raise TypeError("音频轨道片段类型不支持素材替换: %s" % type(segment))
+
+            speed = getattr(getattr(segment, "speed", None), "speed", 1.0) or 1.0
+            if source_timerange is None:
+                if isinstance(material, Video_material) and material.material_type == "photo":
+                    source_timerange = Timerange(0, round(segment.target_timerange.duration * speed))
+                else:
+                    source_timerange = Timerange(0, material.duration)
+            if source_timerange.start < 0 or source_timerange.duration <= 0 or source_timerange.end > material.duration:
+                raise ValueError("素材截取范围 %s 超出素材时长 %d" % (source_timerange, material.duration))
+
+            required_source_duration = round(segment.target_timerange.duration * speed)
+            available_duration = int(source_timerange.duration)
+            source_duration = min(required_source_duration, available_duration)
+            if available_duration < required_source_duration:
+                segment.target_timerange.duration = round(available_duration / speed)
+            segment.source_timerange = Timerange(source_timerange.start, source_duration)
+            segment.material_id = material.material_id
+            segment.material_instance = deepcopy(material)
+            if is_video:
+                segment.material_size = (material.width, material.height)
+            self.add_material(material)
+            return self
+
         if not isinstance(track, ImportedMediaTrack):
             raise TypeError("指定的轨道(类型为 %s)不支持素材替换" % track.track_type)
         if not 0 <= segment_index < len(track):

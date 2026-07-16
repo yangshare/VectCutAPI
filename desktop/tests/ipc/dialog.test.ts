@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'fs/promises';
 import os from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -50,9 +50,11 @@ describe('registerDialogHandlers', () => {
 
     registerDialogHandlers(ipcMain as never);
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(10);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(12);
     expect(ipcMain.handle.mock.calls.map(([channel]) => channel)).toEqual([
       'dialog:selectVideoFile',
+      'dialog:selectVideoFiles',
+      'dialog:selectVideoDirectory',
       'dialog:selectAudioFile',
       'dialog:selectImageFile',
       'dialog:selectSrtFile',
@@ -98,6 +100,48 @@ describe('registerDialogHandlers', () => {
     registerDialogHandlers(ipcMain as never);
 
     await expect(handlers.get('dialog:selectVideoFile')?.()).resolves.toBeNull();
+  });
+
+  it('opens the video picker with multi-selection enabled', async () => {
+    const { ipcMain, handlers } = createFakeIpcMain();
+    const selectedPaths = [join(os.tmpdir(), '002.mp4'), join(os.tmpdir(), '001.mp4')];
+    showOpenDialogMock.mockResolvedValue({ canceled: false, filePaths: selectedPaths });
+    registerDialogHandlers(ipcMain as never);
+
+    await expect(handlers.get('dialog:selectVideoFiles')?.()).resolves.toEqual(selectedPaths);
+    expect(showOpenDialogMock).toHaveBeenCalledWith({
+      title: '选择视频',
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: '视频', extensions: ['mp4', 'mov', 'avi', 'mkv', 'flv'] }],
+    });
+  });
+
+  it('returns supported files from the selected video directory without recursing', async () => {
+    const { ipcMain, handlers } = createFakeIpcMain();
+    const directory = await mkdtemp(join(os.tmpdir(), 'vectcut-video-dir-'));
+    try {
+      await writeFile(join(directory, '001.mp4'), 'video');
+      await writeFile(join(directory, '002.MOV'), 'video');
+      await writeFile(join(directory, 'notes.txt'), 'text');
+      await mkdir(join(directory, 'nested'));
+      await writeFile(join(directory, 'nested', '003.mp4'), 'video');
+      showOpenDialogMock.mockResolvedValue({ canceled: false, filePaths: [directory] });
+      registerDialogHandlers(ipcMain as never);
+
+      const selection = await handlers.get('dialog:selectVideoDirectory')?.();
+      const canonicalDirectory = await realpath(directory);
+
+      expect(selection).toEqual({
+        directory: canonicalDirectory,
+        files: [join(canonicalDirectory, '001.mp4'), join(canonicalDirectory, '002.MOV')],
+      });
+      expect(showOpenDialogMock).toHaveBeenCalledWith({
+        title: '选择视频素材目录',
+        properties: ['openDirectory'],
+      });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it('opens the template folder dialog and returns the first selected folder', async () => {

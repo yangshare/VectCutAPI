@@ -1,11 +1,30 @@
 /** 槽位（后端 import_template 返回） */
-export type SlotType = 'video' | 'audio' | 'bgm' | 'subtitle' | 'cover_image' | 'cover_title';
+export type SlotType =
+  | 'video'
+  | 'audio'
+  | 'bgm'
+  | 'text'
+  | 'subtitle'
+  | 'cover_image'
+  | 'cover_title'
+  | 'effect'
+  | 'adjust'
+  | 'filter'
+  | 'sticker'
+  | 'unknown';
 
 export interface Slot {
   slot_id: string;
+  name?: string;
   type: SlotType;
+  track_type?: string;
   track_name: string;
   segment_index: number;
+  segment_indices?: number[];
+  segment_count?: number;
+  replaceable?: boolean;
+  selected?: boolean;
+  content_preview?: string;
   locator?: SlotLocator;
 }
 
@@ -28,10 +47,25 @@ export interface MaterialMetadata {
   height?: number;    // 图片/视频高度
 }
 
+/** 轨道级视频槽位：materials 是从素材目录按顺序选出的候选视频。 */
+export interface VideoTrackMetadata {
+  slot_id: string;
+  directory?: string;
+  materials: Array<Omit<MaterialMetadata, 'slot_id'>>;
+}
+
+export type MaterialSlotMetadata = MaterialMetadata | VideoTrackMetadata;
+
 /** 字幕元数据 */
 export interface SubtitleMetadata {
   slot_id: string;
   srt_content: string;
+}
+
+/** 手动文字轨元数据 */
+export interface TextSlotMetadata {
+  slot_id: string;
+  text: string;
 }
 
 /** 封面标题元数据 */
@@ -42,17 +76,21 @@ export interface CoverTitleMetadata {
 
 /** 素材填充步骤输出 */
 export interface MaterialFillResult {
-  materials: MaterialMetadata[];
+  materials: MaterialSlotMetadata[];
   subtitles: SubtitleMetadata[];
+  textSlots: TextSlotMetadata[];
   coverTitles: CoverTitleMetadata[];
 }
 
 /** 槽位配置（保存到云端） */
 export interface SlotMapping {
   slot_id: string;
+  name?: string;
   type: Slot['type'];
   track_name: string;
   segment_index: number;
+  segment_indices?: number[];
+  segment_count?: number;
   locator?: SlotLocator;
 }
 
@@ -81,6 +119,8 @@ export interface UserConfig {
 /** 受控 preload API（渲染进程公开契约） */
 export interface VectCutApi {
   selectVideoFile: () => Promise<string | null>;
+  selectVideoFiles: () => Promise<string[]>;
+  selectVideoDirectory: () => Promise<{ directory: string; files: string[] } | null>;
   selectAudioFile: () => Promise<string | null>;
   selectImageFile: () => Promise<string | null>;
   selectSrtFile: () => Promise<string | null>;

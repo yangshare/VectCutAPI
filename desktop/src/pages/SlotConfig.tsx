@@ -9,18 +9,32 @@ interface SlotConfigProps {
   onConfigSaved: (selected: Slot[]) => void;
 }
 
-function toMapping(slot: Slot): SlotMapping {
+export function toMapping(slot: Slot): SlotMapping {
   return {
     slot_id: slot.slot_id,
-    type: slot.type,
+    name: slot.name,
+    type: isSingleTextSlot(slot) ? 'text' : slot.type,
     track_name: slot.track_name,
     segment_index: slot.segment_index,
+    ...(slot.segment_indices ? { segment_indices: slot.segment_indices } : {}),
+    ...(slot.segment_count ? { segment_count: slot.segment_count } : {}),
     ...(slot.locator ? { locator: slot.locator } : {}),
   };
 }
 
+function isSingleTextSlot(slot: Slot): boolean {
+  return (slot.track_type === 'text' || slot.type === 'text' || slot.type === 'subtitle')
+    && (slot.segment_count ?? 1) <= 1;
+}
+
+export function getInitialSelectedSlotIds(slots: Slot[]): Set<string> {
+  return new Set(
+    slots.filter((slot) => slot.replaceable && slot.selected).map((slot) => slot.slot_id),
+  );
+}
+
 export default function SlotConfig({ templateId, slots, onConfigSaved }: SlotConfigProps) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(slots.map((slot) => slot.slot_id)));
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => getInitialSelectedSlotIds(slots));
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -37,7 +51,7 @@ export default function SlotConfig({ templateId, slots, onConfigSaved }: SlotCon
   }
 
   async function handleSave() {
-    const picked = slots.filter((slot) => selectedIds.has(slot.slot_id));
+    const picked = slots.filter((slot) => slot.replaceable && selectedIds.has(slot.slot_id));
     const mappings = picked.map(toMapping);
 
     setIsLoading(true);
@@ -61,40 +75,54 @@ export default function SlotConfig({ templateId, slots, onConfigSaved }: SlotCon
           槽位配置
         </h2>
         <p style={{ margin: 0, color: '#475569' }}>
-          模板 {templateId} 已解析出 {slots.length} 个槽位，勾选本次需要替换的内容。
+          模板 {templateId} 共 {slots.length} 条轨道，请勾选以后每期需要替换的轨道。
         </p>
       </div>
 
       {slots.length === 0 ? (
-        <p style={emptyStyle}>没有解析到可替换槽位，请返回导入步骤检查母版内容。</p>
+        <p style={emptyStyle}>没有解析到轨道，请返回导入步骤检查母版内容。</p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 680 }}>
             <thead>
               <tr>
-                {['选择', 'slot_id', 'type', 'track_name', 'segment_index', 'locator'].map((heading) => (
+                {['选择', '轨道', '类型', '轨道内容', '状态', '稳定定位'].map((heading) => (
                   <th key={heading} style={thStyle}>{heading}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {slots.map((slot) => (
-                <tr key={slot.slot_id}>
+                <tr key={slot.slot_id} style={slot.replaceable ? undefined : preservedRowStyle}>
                   <td style={tdStyle}>
                     <input
                       type="checkbox"
                       checked={selectedIds.has(slot.slot_id)}
                       onChange={() => toggleSlot(slot.slot_id)}
-                      disabled={isLoading}
+                      disabled={isLoading || !slot.replaceable}
                       aria-label={`选择 ${slot.slot_id}`}
                     />
                   </td>
-                  <td style={tdStyle}>{slot.slot_id}</td>
-                  <td style={tdStyle}>{slot.type}</td>
-                  <td style={tdStyle}>{slot.track_name}</td>
-                  <td style={tdStyle}>{slot.segment_index}</td>
                   <td style={tdStyle}>
-                    {slot.locator ? `track ${slot.locator.track_index}, seg ${slot.locator.segment_index}` : '-'}
+                    <strong>{slot.name ?? slot.slot_id}</strong>
+                    <div style={secondaryTextStyle}>{slot.slot_id}</div>
+                  </td>
+                  <td style={tdStyle}>{formatSlotType(slot.type)}</td>
+                  <td style={tdStyle}>
+                    <div>{formatTrackContent(slot)}</div>
+                    {slot.content_preview ? (
+                      <div style={previewTextStyle}>{slot.content_preview}</div>
+                    ) : null}
+                  </td>
+                  <td style={tdStyle}>
+                    {slot.replaceable ? '可配置' : '原样保留'}
+                  </td>
+                  <td style={tdStyle}>
+                    {slot.locator?.track_id
+                      ? `ID ${shortId(slot.locator.track_id)}`
+                      : slot.locator
+                        ? `轨道 ${slot.locator.track_index}`
+                        : slot.track_name || '-'}
                   </td>
                 </tr>
               ))}
@@ -119,6 +147,41 @@ export default function SlotConfig({ templateId, slots, onConfigSaved }: SlotCon
   );
 }
 
+function formatSlotType(type: Slot['type']): string {
+  return {
+    video: '视频',
+    audio: '配音',
+    bgm: '背景音乐',
+    text: '文字',
+    subtitle: '字幕',
+    cover_image: '封面图片',
+    cover_title: '封面标题',
+    effect: '特效',
+    adjust: '调节',
+    filter: '滤镜',
+    sticker: '贴纸',
+    unknown: '其他',
+  }[type];
+}
+
+function formatTrackContent(slot: Slot): string {
+  const count = slot.segment_count ?? 1;
+  if (slot.track_type === 'text' || slot.type === 'subtitle') {
+    return `${count} 条文字片段`;
+  }
+  if (slot.track_type === 'video' || slot.type === 'video') {
+    return `${count} 个视频片段`;
+  }
+  if (slot.track_type === 'audio' || slot.type === 'audio' || slot.type === 'bgm') {
+    return `${count} 个音频片段`;
+  }
+  return `${count} 个片段`;
+}
+
+function shortId(value: string): string {
+  return value.length > 12 ? `${value.slice(0, 8)}...` : value;
+}
+
 const thStyle = {
   borderBottom: '1px solid #cbd5e1',
   padding: '10px 8px',
@@ -133,6 +196,27 @@ const tdStyle = {
   padding: '10px 8px',
   verticalAlign: 'middle',
   wordBreak: 'break-word',
+} satisfies React.CSSProperties;
+
+const secondaryTextStyle = {
+  marginTop: 3,
+  color: '#64748b',
+  fontSize: 12,
+} satisfies React.CSSProperties;
+
+const previewTextStyle = {
+  marginTop: 3,
+  maxWidth: 360,
+  color: '#475569',
+  fontSize: 12,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+} satisfies React.CSSProperties;
+
+const preservedRowStyle = {
+  color: '#64748b',
+  background: '#f8fafc',
 } satisfies React.CSSProperties;
 
 const primaryButtonStyle = {

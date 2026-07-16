@@ -21,6 +21,8 @@ export const ERROR_MESSAGES: Record<string, string> = {
   R_INVALID_PATH: '素材路径格式无效，请选择有效的本地文件',
   R_INVALID_DURATION: '素材时长异常（可能为 0 或过大），请检查文件是否损坏',
   R_INVALID_MATERIAL_METADATA: '素材路径或元数据无效，请重新选择素材',
+  R_MATERIAL_COUNT_MISMATCH: '视频数量与母版轨道片段数不一致，请重新批量选择',
+  R_VIDEO_DURATION_SHORT: '视频目录总时长不足，请补充视频素材',
   R_LOOP_TOO_MANY: '视频时长远小于配音时长，请增加更多视频片段',
   R_SRT_PARSE_ERROR: 'SRT 字幕文件格式错误，请检查时间轴格式',
   R_GENERATE_FAILED: '草稿生成失败，请查看详细错误信息',

@@ -11,6 +11,92 @@ import tempfile
 import zipfile
 
 
+@pytest.mark.parametrize("track_kind", ["video", "audio"])
+def test_replace_material_supports_tracks_loaded_from_template(track_kind):
+    """load_template 生成的普通 Track 也必须支持按片段替换素材。"""
+    from pyJianYingDraft.audio_segment import Audio_segment
+    from pyJianYingDraft.local_materials import Audio_material, Video_material
+    from pyJianYingDraft.script_file import Script_file
+    from pyJianYingDraft.time_util import Timerange
+    from pyJianYingDraft.track import Track, Track_type
+    from pyJianYingDraft.video_segment import Video_segment
+
+    script = Script_file(1080, 1920)
+    track_type = Track_type.video if track_kind == "video" else Track_type.audio
+    track = Track(track_type, "loaded_track", 0, False)
+
+    if track_kind == "video":
+        old_material = Video_material(
+            "video", remote_url="placeholder://old", material_name="old.mp4",
+            duration=10.0, width=1080, height=1920,
+        )
+        new_material = Video_material(
+            "video", remote_url="placeholder://new", material_name="new.mp4",
+            duration=8.0, width=1920, height=1080,
+        )
+        segment = Video_segment(
+            old_material,
+            Timerange(0, 5_000_000),
+            source_timerange=Timerange(0, 5_000_000),
+        )
+    else:
+        old_material = Audio_material(
+            remote_url="placeholder://old", material_name="old.mp3", duration=10.0,
+        )
+        new_material = Audio_material(
+            remote_url="placeholder://new", material_name="new.mp3", duration=8.0,
+        )
+        segment = Audio_segment(
+            old_material,
+            Timerange(0, 5_000_000),
+            source_timerange=Timerange(0, 5_000_000),
+        )
+
+    track.segments.append(segment)
+    script.imported_tracks.append(track)
+
+    script.replace_material_by_seg(track, 0, new_material)
+
+    assert segment.material_id == new_material.material_id
+    assert segment.material_instance.material_id == new_material.material_id
+    assert segment.source_timerange == Timerange(0, 5_000_000)
+    assert segment.target_timerange == Timerange(0, 5_000_000)
+    target_materials = script.materials.videos if track_kind == "video" else script.materials.audios
+    assert new_material in target_materials
+
+
+def test_replace_material_shrinks_loaded_track_segment_for_short_material():
+    """新素材较短时，普通 Track 的片段时长应同步缩短。"""
+    from pyJianYingDraft.local_materials import Video_material
+    from pyJianYingDraft.script_file import Script_file
+    from pyJianYingDraft.time_util import Timerange
+    from pyJianYingDraft.track import Track, Track_type
+    from pyJianYingDraft.video_segment import Video_segment
+
+    old_material = Video_material(
+        "video", remote_url="placeholder://old", material_name="old.mp4",
+        duration=10.0, width=1080, height=1920,
+    )
+    short_material = Video_material(
+        "video", remote_url="placeholder://short", material_name="short.mp4",
+        duration=2.0, width=1920, height=1080,
+    )
+    segment = Video_segment(
+        old_material,
+        Timerange(1_000_000, 5_000_000),
+        source_timerange=Timerange(0, 5_000_000),
+    )
+    track = Track(Track_type.video, "loaded_track", 0, False)
+    track.segments.append(segment)
+    script = Script_file(1080, 1920)
+    script.imported_tracks.append(track)
+
+    script.replace_material_by_seg(track, 0, short_material)
+
+    assert segment.source_timerange == Timerange(0, 2_000_000)
+    assert segment.target_timerange == Timerange(1_000_000, 2_000_000)
+
+
 def test_video_material_bypass_ffprobe():
     """验证用 remote_url + 元数据可绕过 ffprobe。
 

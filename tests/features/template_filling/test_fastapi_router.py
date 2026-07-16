@@ -262,6 +262,27 @@ def test_import_draft_content_content_length_middleware_uses_draft_limit(monkeyp
     assert data["error"]["code"] == "T_DRAFT_CONTENT_TOO_LARGE"
 
 
+def test_import_draft_content_cors_preflight_allows_authorization():
+    """CORS 预检：带 Origin + Authorization 的跨域 POST 必须被放行。
+
+    桌面客户端用 axios Basic Auth 会发送 Authorization 头，使请求变为"需预检请求"。
+    后端必须正确响应 OPTIONS 预检（200 + Access-Control-Allow-*），否则浏览器
+    阻断实际 POST 并抛 Network Error（这是"导入并解析槽位报 Network Error"的根因）。
+    """
+    resp = client.options(
+        "/api/template/import-draft-content?template_id=t1",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization,content-type",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.headers["access-control-allow-origin"] == "*"
+    allow_headers = resp.headers.get("access-control-allow-headers", "").lower()
+    assert "authorization" in allow_headers
+
+
 class _ChunkOnlyUpload:
     """Test double that fails if router reads the entire upload in one call."""
 
@@ -583,6 +604,30 @@ def test_render_endpoint_preserves_vectcut_error_code(monkeypatch):
     assert data["success"] is False
     assert data["error"]["code"] == "S_NOT_FOUND"
     assert data["error"]["details"] == {"template_id": "t1"}
+
+
+def test_render_endpoint_maps_unexpected_engine_error(monkeypatch):
+    """未知引擎异常应返回可展示的生成错误，不能中断 HTTP 连接。"""
+
+    def _raise(_template_id, _req):
+        raise RuntimeError("engine failed")
+
+    monkeypatch.setattr(service, "render_draft", _raise)
+
+    resp = client.post(
+        "/api/template/render",
+        json={
+            "template_id": "t1",
+            "slot_values": {"video_main_0": {"path": "/v.mp4", "duration": 5.0}},
+            "output_draft_name": "out",
+        },
+    )
+
+    data = resp.json()
+    assert resp.status_code == 200
+    assert data["success"] is False
+    assert data["error"]["code"] == "R_GENERATE_FAILED"
+    assert data["error"]["details"] == {"reason": "engine failed"}
 
 
 # ─── GET /api/template/download/{draft_id} ───────────────────────────────────
