@@ -222,9 +222,10 @@ def import_track(json_data: Dict[str, Any], imported_materials: Dict[str, Any] =
     """
     track_type = Track_type.from_name(json_data["type"])
     # 创建新的Track实例，保留所有原始属性
+    # 新版剪映(8.9.0+) 草稿 track 省略 name（改用 is_default_name 布尔值），缺省时用空串。
     track = Track(
         track_type=track_type,
-        name=json_data["name"],
+        name=json_data.get("name", ""),
         render_index=max([int(seg.get("render_index", 0)) for seg in json_data.get("segments", [])], default=0),
         mute=bool(json_data.get("attribute", 0))
     )
@@ -265,22 +266,29 @@ def import_track(json_data: Dict[str, Any], imported_materials: Dict[str, Any] =
             
             if material:
                 # 创建视频片段
+                # 新版剪映(8.9.0+) 草稿 timerange 可能省略 start（首段起点 0 被省略）、clip 结构可能变化，
+                # 此处统一用 .get() + 语义安全默认值兜底，避免 KeyError。
+                target_tr = segment_data.get("target_timerange") or {}
+                source_tr = segment_data.get("source_timerange") or {}
+                clip = segment_data.get("clip") or {}
+                transform = clip.get("transform") or {}
+                scale = clip.get("scale") or {}
                 segment = Video_segment(
                     material=material,
                     target_timerange=Timerange(
-                        start=segment_data["target_timerange"]["start"],
-                        duration=segment_data["target_timerange"]["duration"]
+                        start=target_tr.get("start", 0),
+                        duration=target_tr.get("duration", 0)
                     ),
                     source_timerange=Timerange(
-                        start=segment_data["source_timerange"]["start"],
-                        duration=segment_data["source_timerange"]["duration"]
+                        start=source_tr.get("start", 0),
+                        duration=source_tr.get("duration", 0)
                     ),
                     speed=segment_data.get("speed", 1.0),
                     clip_settings=Clip_settings(
-                        transform_x=segment_data["clip"]["transform"]["x"],
-                        transform_y=segment_data["clip"]["transform"]["y"],
-                        scale_x=segment_data["clip"]["scale"]["x"],
-                        scale_y=segment_data["clip"]["scale"]["y"]
+                        transform_x=transform.get("x", 0.0),
+                        transform_y=transform.get("y", 0.0),
+                        scale_x=scale.get("x", 1.0),
+                        scale_y=scale.get("y", 1.0)
                     )
                 )
                 segment.volume = segment_data.get("volume", 1.0)
@@ -295,11 +303,13 @@ def import_track(json_data: Dict[str, Any], imported_materials: Dict[str, Any] =
             
             if material:
                 # 创建音频片段
+                # 新版剪映(8.9.0+) 草稿 timerange 可能省略 start，用 .get() 兜底。
+                target_tr = segment_data.get("target_timerange") or {}
                 segment = Audio_segment(
                     material=material,
                     target_timerange=Timerange(
-                        start=segment_data["target_timerange"]["start"],
-                        duration=segment_data["target_timerange"]["duration"]
+                        start=target_tr.get("start", 0),
+                        duration=target_tr.get("duration", 0)
                     ),
                     volume=segment_data.get("volume", 1.0)
                 )

@@ -52,7 +52,10 @@ class Timerange:
     @classmethod
     def import_json(cls, json_obj: Dict[str, str]) -> "Timerange":
         """从json对象中恢复Timerange"""
-        return cls(int(json_obj["start"]), int(json_obj["duration"]))
+        # 新版剪映(8.9.0+) 草稿每个轨道首个 segment 常省略 start（语义即起点 0，零值被省略），
+        # 此处用 .get() 兜底。此方法是 assign_attr_with_json 解析 target/source_timerange 的公共根，
+        # 兜底一次即覆盖 ImportedSegment/ImportedMediaSegment 全部分支。旧版有字段时取原值，零影响。
+        return cls(int(json_obj.get("start", 0)), int(json_obj.get("duration", 0)))
 
     @property
     def end(self) -> int:

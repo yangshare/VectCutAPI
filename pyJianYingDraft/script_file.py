@@ -227,6 +227,9 @@ class Script_file:
         with open(json_path, "r", encoding="utf-8") as f:
             obj.content = json.load(f)
 
+        # 新版剪映(8.9.0+, new_version 171.0.0+) 草稿顶层省略 fps（移至 function_assistant_info.fps 且为空），
+        # 此处补默认 30 帧，兼容旧版引擎对顶层 fps 的假设；旧版草稿有 fps 时 setdefault 不覆盖。
+        obj.content.setdefault("fps", 30.0)
         util.assign_attr_with_json(obj, ["fps", "duration"], obj.content)
         util.assign_attr_with_json(obj, ["width", "height"], obj.content["canvas_config"])
 
